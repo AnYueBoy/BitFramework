@@ -2,6 +2,6 @@
 {
     public interface IParams
     {
-        bool TryGetValue(string key, out object value
+        bool TryGetValue(string key, out object value);
     }
 }

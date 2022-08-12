@@ -118,7 +118,7 @@ public class OdinMapEditor : OdinEditorWindow
         SirenixEditorGUI.DrawBorders(rect.AlignTop(20).SetHeight(21).SetWidth(rect.width + 1), 1);
 
         GUIHelper.PushContentColor(Color.black);
-        GUI.Label(rect.AlignTop(20), "A");
+        GUI.Label(rect.AlignTop(20).AlignCenter(0).SetWidth(400), "地图名称");
         GUIHelper.PopContentColor();
 
         rect = rect.AlignBottom(rect.height - 20);
@@ -143,7 +143,7 @@ public class OdinMapEditor : OdinEditorWindow
                 if (mapDataArray[x, y].id > -1)
                 {
                     GUIHelper.PushColor(Color.black);
-                    GUI.Label(tileRect.AlignRight(18).AlignTop(18), mapDataArray[x, y].id.ToString());
+                    GUI.Label(tileRect.AlignLeft(40).AlignTop(18), mapDataArray[x, y].id.ToString());
                     GUIHelper.PopColor();
                 }
 
