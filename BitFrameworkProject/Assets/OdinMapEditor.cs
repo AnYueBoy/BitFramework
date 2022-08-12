@@ -24,64 +24,84 @@ public class OdinMapEditor : OdinEditorWindow
         "3"
     };
 
-    private List<string> enemyList = new List<string>()
-    {
-        "Enemy1",
-        "Enemy2",
-        "Enemy3",
-        "Enemy4"
-    };
-
 
     [ValueDropdown("allFilePathList"), InlineButton("DrawMap")]
     public string curMapFile;
 
     private void DrawMap()
     {
-        loadMapData();
+        LoadMapData();
     }
 
-    private TileType[,] visibleArray = new TileType[10, 10];
 
-    private GenericMenu menu;
+    #region 加载构建必要资源
+
+    private List<Texture2D> enemyIconList = new List<Texture2D>();
+
+    private readonly string iconPath = "Assets/PetsPack";
+
+    private void LoadIcon()
+    {
+        enemyIconList.Clear();
+        string[] files = Directory.GetFiles(iconPath, "*.png");
+        foreach (string file in files)
+        {
+            Texture2D texture2D = AssetDatabase.LoadAssetAtPath<Texture2D>(file);
+            enemyIconList.Add(texture2D);
+        }
+
+        enemyIconList.Sort((a, b) => String.Compare(a.name, b.name, StringComparison.Ordinal));
+    }
+
+    private GenericMenu enemyMenu;
 
     protected override void Initialize()
     {
         base.Initialize();
 
-        menu = new GenericMenu();
+        enemyMenu = new GenericMenu();
         for (int i = 2; i <= 6; i++)
         {
-            menu.AddItem(new GUIContent(i.ToString()), false, SelectCallback, i);
-            menu.AddSeparator("");
+            enemyMenu.AddItem(new GUIContent(i.ToString()), false, SelectCallback, i);
+            enemyMenu.AddSeparator("");
         }
 
         LoadIcon();
     }
 
+    #endregion
+
     private bool mapLoadCompleted;
 
-    private void loadMapData()
+    private TileData[,] mapDataArray;
+
+    private void LoadMapData()
     {
+        // TODO: 根据选中的地图文件生成地图数据
+
+        mapDataArray = new TileData[10, 10];
         for (int i = 0; i < 10; i++)
         {
             for (int j = 0; j < 10; j++)
             {
-                visibleArray[i, j] = (TileType)Random.Range(0, 7);
+                mapDataArray[i, j] = new TileData((TileType)Random.Range(0, 7));
             }
         }
 
         mapLoadCompleted = true;
     }
 
-    private Vector2Int curCell = Vector2Int.zero;
+    private Vector2Int curOperateCell = Vector2Int.zero;
+
+    private Vector2Int preEnterCell = Vector2Int.down;
 
     private void SelectCallback(object data)
     {
-        visibleArray[curCell.x, curCell.y] = (TileType)(int)data;
+        mapDataArray[curOperateCell.x, curOperateCell.y].tileType = (TileType)(int)data;
     }
 
-    private bool drawEnemyList;
+    private string modifyText = "-1";
+    private bool isRightClick;
 
     protected override void DrawEditor(int index)
     {
@@ -111,85 +131,92 @@ public class OdinMapEditor : OdinEditorWindow
 
             int x = i % 10;
             int y = i / 10;
-            if (visibleArray[x, y] == TileType.Obstacle)
+            if (mapDataArray[x, y].tileType == TileType.Obstacle)
             {
                 SirenixEditorGUI.DrawSolidRect(
                     new Rect(tileRect.x + 1, tileRect.y + 1, tileRect.width - 1, tileRect.height - 1),
                     new Color(0.3f, 0.3f, 0.3f, 1f));
             }
 
-            if (visibleArray[x, y] == TileType.Enemy1)
+            if (mapDataArray[x, y].tileType >= TileType.Enemy1)
             {
-                GUI.Label(tileRect.AlignCenter(18).AlignMiddle(18), enemyIconList[(int)TileType.Enemy1 - 2]);
+                if (mapDataArray[x, y].id > -1)
+                {
+                    GUIHelper.PushColor(Color.black);
+                    GUI.Label(tileRect.AlignRight(18).AlignTop(18), mapDataArray[x, y].id.ToString());
+                    GUIHelper.PopColor();
+                }
+
+                GUI.Label(tileRect.AlignCenter(18).AlignMiddle(18),
+                    enemyIconList[(int)mapDataArray[x, y].tileType - 2]);
             }
 
-            if (visibleArray[x, y] == TileType.Enemy2)
+            if (mapDataArray[x, y].tileType != TileType.Obstacle && tileRect.Contains(Event.current.mousePosition))
             {
-                GUI.Label(tileRect.AlignCenter(18).AlignMiddle(18), enemyIconList[(int)TileType.Enemy2 - 2]);
-            }
+                if (preEnterCell.x != x || preEnterCell.y != y)
+                {
+                    preEnterCell = new Vector2Int(x, y);
+                    isRightClick = false;
+                }
 
-            if (visibleArray[x, y] == TileType.Enemy3)
-            {
-                GUI.Label(tileRect.AlignCenter(18).AlignMiddle(18), enemyIconList[(int)TileType.Enemy3 - 2]);
-            }
-
-            if (visibleArray[x, y] == TileType.Enemy4)
-            {
-                GUI.Label(tileRect.AlignCenter(18).AlignMiddle(18), enemyIconList[(int)TileType.Enemy4 - 2]);
-            }
-
-            if (visibleArray[x, y] == TileType.Enemy5)
-            {
-                GUI.Label(tileRect.AlignCenter(18).AlignMiddle(18), enemyIconList[(int)TileType.Enemy5 - 2]);
-                GUIHelper.PushColor(Color.black);
-                GUI.Label(tileRect.AlignRight(18).AlignTop(18), (x + y).ToString());
-                GUIHelper.PopColor();
-            }
-
-            if (tileRect.Contains(Event.current.mousePosition) && visibleArray[x, y] != TileType.Obstacle)
-            {
                 SirenixEditorGUI.DrawSolidRect(
                     new Rect(tileRect.x + 1, tileRect.y + 1, tileRect.width - 1, tileRect.height - 1),
                     new Color(0f, 1f, 0f, 0.3f));
 
-                if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
+                if (!isRightClick && Event.current.type == EventType.MouseDown && Event.current.button == 0)
                 {
-                    if (visibleArray[x, y] >= TileType.Enemy1)
+                    if (mapDataArray[x, y].tileType >= TileType.Enemy1)
                     {
-                        visibleArray[x, y] = TileType.Empty;
+                        mapDataArray[x, y].tileType = TileType.Empty;
                     }
                     else
                     {
-                        DrawEnemyList();
-                        curCell = new Vector2Int(x, y);
+                        DrawEnemyMenu();
+                        curOperateCell = new Vector2Int(x, y);
                     }
 
                     Event.current.Use();
                 }
             }
+
+            if (isRightClick && curOperateCell.x == x && curOperateCell.y == y)
+            {
+                GUI.SetNextControlName("IdInputText");
+                modifyText = GUI.TextArea(tileRect.AlignCenter(40).AlignMiddle(40), modifyText);
+                GUI.FocusControl("IdInputText");
+                if (GUI.changed)
+                {
+                    for (int j = 0; j < modifyText.Length; j++)
+                    {
+                        if (modifyText[j] == 10)
+                        {
+                            isRightClick = false;
+                            break;
+                        }
+                    }
+
+                    modifyText = modifyText.Trim();
+                    if (int.TryParse(modifyText, out int idValue))
+                    {
+                        mapDataArray[curOperateCell.x, curOperateCell.y].id = idValue;
+                    }
+                }
+            }
+
+            if (mapDataArray[x, y].tileType >= TileType.Enemy1 && tileRect.Contains(Event.current.mousePosition) &&
+                Event.current.type == EventType.MouseDown && Event.current.button == 1)
+            {
+                // 右键修改存在怪物的id
+                isRightClick = true;
+                curOperateCell = new Vector2Int(x, y);
+                Event.current.Use();
+            }
         }
     }
 
-    private void DrawEnemyList()
+    private void DrawEnemyMenu()
     {
-        menu.ShowAsContext();
-    }
-
-    private List<Texture2D> enemyIconList = new List<Texture2D>();
-
-    private readonly string iconPath = "Assets/PetsPack";
-
-    private void LoadIcon()
-    {
-        enemyIconList.Clear();
-        string[] files = Directory.GetFiles(iconPath, "*.png");
-        foreach (string file in files)
-        {
-            Texture2D texture2D = AssetDatabase.LoadAssetAtPath<Texture2D>(file);
-            enemyIconList.Add(texture2D);
-        }
-
-        enemyIconList.Sort((a, b) => String.Compare(a.name, b.name, StringComparison.Ordinal));
+        enemyMenu.ShowAsContext();
     }
 }
 
