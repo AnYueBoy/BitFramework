@@ -242,7 +242,9 @@ namespace BitFramework.Conatiner
                         result = Make(conversionType.ToString(), result);
                         return true;
                     }
+#pragma warning disable CS0168
                     catch (Exception e)
+#pragma warning restore CS0168
                     {
                         // 当抛异常时注入停止
                     }
@@ -268,7 +270,9 @@ namespace BitFramework.Conatiner
                     return true;
                 }
             }
+#pragma warning disable CS0168
             catch (Exception e)
+#pragma warning restore CS0168
             {
                 // 当抛异常时注入停止
             }
