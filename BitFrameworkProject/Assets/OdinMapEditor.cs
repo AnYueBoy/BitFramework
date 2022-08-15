@@ -115,8 +115,8 @@ public class OdinMapEditor : OdinEditorWindow
             return;
         }
 
-        Rect rect = EditorGUILayout.GetControlRect(true, 2000 + 20);
-        rect = rect.AlignCenter(2000);
+        Rect rect = EditorGUILayout.GetControlRect(true, 400 + 20);
+        rect = rect.AlignCenter(400);
         rect.position += changeRect;
         if (Event.current.type == EventType.MouseDown && Event.current.button == 2)
         {

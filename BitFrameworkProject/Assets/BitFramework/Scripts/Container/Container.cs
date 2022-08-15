@@ -24,6 +24,12 @@ namespace BitFramework.Conatiner
         // 正在构建的服务参数栈
         private Stack<object[]> userParamsStack { get; }
 
+        // 根据服务名称获取服务类型的回调列表
+        private readonly List<Func<string, Type>> findType;
+
+        // 缓存服务到具体服务类型的缓存
+        private readonly Dictionary<string, Type> findTypeCache;
+
         public IBindData Bind(string service, Type concrete, bool isStatic)
         {
             if (IsUnableType(concrete))
@@ -51,7 +57,6 @@ namespace BitFramework.Conatiner
                 throw new Exception($"instances {service} is exist.");
             }
 
-            // TODO:
             BindData bindData = new BindData(service, concrete, isStatic);
             bindings.Add(service, bindData);
             if (IsMade(service))
@@ -89,7 +94,9 @@ namespace BitFramework.Conatiner
             try
             {
                 BindData bindData = GetBindData(service);
-                // instance = 
+                // 构建一个服务实例，并尝试进行依赖的注入.
+                instance = Build(bindData, userParams);
+                // TODO:
             }
             finally
             {
@@ -106,10 +113,13 @@ namespace BitFramework.Conatiner
 
         private object Build(BindData bindData, object[] userParams)
         {
+            // 如果绑定数据的自定义构建存在，则使用自定义构建逻辑
             if (bindData.Concrete != null)
             {
                 return bindData.Concrete.Invoke(userParams);
             }
+
+            var instance = CreateInstance(bindData, SpeculatedServiceType(bindData.Service), userParams);
 
             // TODO: FIXME: 
             return null;
@@ -122,8 +132,48 @@ namespace BitFramework.Conatiner
                 throw new Exception($"create instance type is not unable type. service name :{bindData.Service}");
             }
 
-            // TODO: FIXME:
-            return null;
+            userParams = GetConstructorsInjectParams(bindData, type, userParams);
+            try
+            {
+                return CreateInstance(type, userParams);
+            }
+            catch (Exception e)
+            {
+                // TODO:
+                throw new Exception("Create Instance Failed.");
+            }
+        }
+
+        private object CreateInstance(Type type, object[] userParams)
+        {
+            if (userParams == null || userParams.Length <= 0)
+            {
+                return Activator.CreateInstance(type);
+            }
+
+            return Activator.CreateInstance(type, userParams);
+        }
+
+        /// <summary>
+        /// 根据服务名称推测服务类型
+        /// </summary>
+        private Type SpeculatedServiceType(string service)
+        {
+            if (findTypeCache.TryGetValue(service, out Type result))
+            {
+                return result;
+            }
+
+            foreach (var finder in findType)
+            {
+                var type = finder.Invoke(service);
+                if (type != null)
+                {
+                    return findTypeCache[service] = type;
+                }
+            }
+
+            return findTypeCache[service] = null;
         }
 
         private object[] GetConstructorsInjectParams(BindData bindData, Type type, object[] userParams)
@@ -300,7 +350,7 @@ namespace BitFramework.Conatiner
 
         private bool IsBasicType(Type type)
         {
-            //获取一个值，通过该值指示 Type 是否为基元类型之一。
+            // 获取一个值，通过该值指示 Type 是否为基元类型之一。
             // 基元类型有 Boolean, Byte, SByte, Int16, UInt16, Int32, UInt32, Int64, UInt64, IntPtr, UIntPtr, Char, Double, and Single.
             return type == null || type.IsPrimitive || type == typeof(string);
         }
