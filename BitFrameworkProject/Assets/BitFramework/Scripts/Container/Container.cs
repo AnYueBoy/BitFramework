@@ -96,12 +96,11 @@ namespace BitFramework.Conatiner
                 BindData bindData = GetBindData(service);
                 // 构建一个服务实例，并尝试进行依赖的注入.
                 instance = Build(bindData, userParams);
+                // TODO: instance = Extend();
+
                 // TODO:
             }
             finally
-            {
-            }
-
             {
                 buildStack.Pop();
                 userParamsStack.Pop();
@@ -114,14 +113,16 @@ namespace BitFramework.Conatiner
         private object Build(BindData bindData, object[] userParams)
         {
             // 如果绑定数据的自定义构建存在，则使用自定义构建逻辑
-            if (bindData.Concrete != null)
-            {
-                return bindData.Concrete.Invoke(userParams);
-            }
+            var instance = bindData.Concrete != null
+                ? bindData.Concrete.Invoke(userParams)
+                : CreateInstance(bindData, SpeculatedServiceType(bindData.Service), userParams);
 
-            var instance = CreateInstance(bindData, SpeculatedServiceType(bindData.Service), userParams);
+            return Inject(bindData, instance);
+        }
 
-            // TODO: FIXME: 
+        private object Inject(BindData bindData, object instance)
+        {
+            // TODO:
             return null;
         }
 
@@ -139,8 +140,13 @@ namespace BitFramework.Conatiner
             }
             catch (Exception e)
             {
-                // TODO:
-                throw new Exception("Create Instance Failed.");
+                string errorInfo = type != null
+                    ? $"Class {type} build failed. Service is {type}"
+                    : $"Service [{bindData.Service}] is not exist";
+                string stackInfo = string.Join(" ,", buildStack.ToArray());
+                errorInfo += $"While building stack [{stackInfo}]";
+                errorInfo += e;
+                throw new Exception($"Create Instance Failed. {errorInfo}");
             }
         }
 
