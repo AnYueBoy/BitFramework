@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
+using Sirenix.Serialization;
 using Sirenix.Utilities;
 using Sirenix.Utilities.Editor;
 using UnityEditor;
@@ -103,6 +104,9 @@ public class OdinMapEditor : OdinEditorWindow
     private string modifyText = "-1";
     private bool isRightClick;
 
+    private bool middleBtnTrigger;
+    private Vector2 changeRect = Vector2.zero;
+
     protected override void DrawEditor(int index)
     {
         base.DrawEditor(index);
@@ -110,9 +114,25 @@ public class OdinMapEditor : OdinEditorWindow
         {
             return;
         }
- 
-        Rect rect = EditorGUILayout.GetControlRect(true, 400 + 20);
-        rect = rect.AlignCenter(400);
+
+        Rect rect = EditorGUILayout.GetControlRect(true, 2000 + 20);
+        rect = rect.AlignCenter(2000);
+        rect.position += changeRect;
+        if (Event.current.type == EventType.MouseDown && Event.current.button == 2)
+        {
+            middleBtnTrigger = true;
+        }
+
+        if (Event.current.type == EventType.MouseUp && Event.current.button == 2)
+        {
+            middleBtnTrigger = false;
+        }
+
+        if (middleBtnTrigger && Event.current.type == EventType.MouseDrag)
+        {
+            Vector2 delta = Event.current.delta;
+            changeRect += delta;
+        }
 
         SirenixEditorGUI.DrawSolidRect(rect.AlignTop(20), new Color(0.5f, 0.5f, 0.5f, 1f));
         SirenixEditorGUI.DrawBorders(rect.AlignTop(20).SetHeight(21).SetWidth(rect.width + 1), 1);
