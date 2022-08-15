@@ -121,17 +121,20 @@ public class OdinMapEditor : OdinEditorWindow
         if (Event.current.type == EventType.MouseDown && Event.current.button == 2)
         {
             middleBtnTrigger = true;
+            Event.current.Use();
         }
 
         if (Event.current.type == EventType.MouseUp && Event.current.button == 2)
         {
             middleBtnTrigger = false;
+            Event.current.Use();
         }
 
         if (middleBtnTrigger && Event.current.type == EventType.MouseDrag)
         {
             Vector2 delta = Event.current.delta;
             changeRect += delta;
+            Event.current.Use();
         }
 
         SirenixEditorGUI.DrawSolidRect(rect.AlignTop(20), new Color(0.5f, 0.5f, 0.5f, 1f));
@@ -188,6 +191,7 @@ public class OdinMapEditor : OdinEditorWindow
                     if (mapDataArray[x, y].tileType >= TileType.Enemy1)
                     {
                         mapDataArray[x, y].tileType = TileType.Empty;
+                        mapDataArray[x, y].id = -1;
                     }
                     else
                     {
