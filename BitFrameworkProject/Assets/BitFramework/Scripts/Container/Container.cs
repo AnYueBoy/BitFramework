@@ -197,22 +197,26 @@ namespace BitFramework.Conatiner
             {
                 try
                 {
-                    // TODO:
-                    return null;
+                    return GetDependencies(bindData, constructor.GetParameters(), userParams);
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e);
-                    throw;
+                    if (exceptionDispatchInfo == null)
+                    {
+                        // 将异常重新捕获
+                        exceptionDispatchInfo = ExceptionDispatchInfo.Capture(e);
+                    }
                 }
             }
 
-            // FIXME
-            return null;
+            // 重新抛出异常
+            exceptionDispatchInfo?.Throw();
+            throw new Exception($"exception dispatch info is null.");
         }
 
         private object[] GetDependencies(BindData bindData, ParameterInfo[] baseParams, object[] userParams)
         {
+            // 构造函数接受的参数列表 baseParams
             if (baseParams.Length <= 0)
             {
                 return Array.Empty<object>();
@@ -220,9 +224,60 @@ namespace BitFramework.Conatiner
 
             var results = new object[baseParams.Length];
 
-            //TODO: 
-            // FIXME:
-            return null;
+            // 获取用于筛选参数的参数匹配器
+            var matcher = GetParamsMatcher(ref userParams);
+            for (int i = 0; i < baseParams.Length; i++)
+            {
+                var baseParam = baseParams[i];
+
+                // 参数匹配用于匹配参数。
+                // 参数匹配器是第一个执行的，因为它们匹配精度是最精确的
+                var param = matcher?.Invoke(baseParam);
+
+                // 当容器发现开发人员使用object或object[]作为对于依赖参数类型，我们尝试压缩并注入用户参数
+                param = param ?? GetCompactInjectUserParams(baseParam, ref userParams);
+
+                // 从用户参数中选择适当的参数并注入,它们以相对顺序排列
+                param = param ?? GetDependenciesFromUserParams(baseParam, ref userParams);
+
+                string needService = null;
+                if (param == null)
+                {
+                    // 尝试通过依赖关系生成所需的参数并注入到容器中
+                    needService = baseParam.ParameterType.ToString();
+                    if (baseParam.ParameterType.IsClass || baseParam.ParameterType.IsInterface)
+                    {
+                        // TODO:
+                        // param = ResolveClass();
+                    }
+                    else
+                    {
+                        // TODO:
+                    }
+                }
+
+                // 对获得的注入实例执行依赖注入检查。
+                if (!CanInject(baseParam.ParameterType, param))
+                {
+                    string errorInfo =
+                        $"[{bindData.Service}] Params inject type must be [{baseParam.ParameterType}], But instance is [{param?.GetType()}]";
+
+                    if (needService == null)
+                    {
+                        errorInfo += " Inject params from user incoming parameters.";
+                    }
+                    else
+                    {
+                        errorInfo += $" Make service is [{needService}].";
+                    }
+
+                    throw new Exception(errorInfo);
+                }
+
+                results[i] = param;
+            }
+
+            return results;
         }
 
         private Func<ParameterInfo, object> GetParamsMatcher(ref object[] userParams)
@@ -334,6 +389,78 @@ namespace BitFramework.Conatiner
             }
 
             return false;
+        }
+
+        private bool CheckCompactInjectUserParams(ParameterInfo baseParam, object[] userParams)
+        {
+            if (userParams == null || userParams.Length <= 0)
+            {
+                return false;
+            }
+
+            return baseParam.ParameterType == (typeof(object[])) || baseParam.ParameterType == typeof(object);
+        }
+
+        private object GetCompactInjectUserParams(ParameterInfo baseParam, ref object[] userParams)
+        {
+            if (!CheckCompactInjectUserParams(baseParam, userParams))
+            {
+                return null;
+            }
+
+            try
+            {
+                if (baseParam.ParameterType == typeof(object) && userParams != null && userParams.Length == 1)
+                {
+                    return userParams[0];
+                }
+
+                return userParams;
+            }
+            finally
+            {
+                userParams = null;
+            }
+        }
+
+        /// <summary>
+        /// 从用户参数中获取依赖项。
+        /// </summary>
+        private object GetDependenciesFromUserParams(ParameterInfo baseParam, ref object[] userParams)
+        {
+            if (userParams == null)
+            {
+                return null;
+            }
+
+            if (userParams.Length > 255)
+            {
+                throw new Exception($"Too many parameters.");
+            }
+
+            object removeParam = null;
+            List<object> originParamList = new List<object>(userParams);
+
+            for (int i = 0; i < userParams.Length; i++)
+            {
+                var userParam = userParams[i];
+                if (!ChangeType(ref userParam, baseParam.ParameterType))
+                {
+                    continue;
+                }
+
+                removeParam = userParam;
+                originParamList.Remove(userParam);
+            }
+
+            userParams = originParamList.ToArray();
+            return removeParam;
+        }
+
+        private bool CanInject(Type type, object instance)
+        {
+            // 确定指定的对象是否是当前 Type 的实例,包括继承关系与接口实现关系
+            return instance == null || type.IsInstanceOfType(instance);
         }
 
         private BindData GetBindData(string service)
