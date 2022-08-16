@@ -335,6 +335,9 @@ namespace BitFramework.Conatiner
             };
         }
 
+        /// <summary>
+        /// 将实例转换为指定类型
+        /// </summary>
         private bool ChangeType(ref object result, Type conversionType)
         {
             try
