@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace BitFramework.Conatiner
+namespace BitFramework.Container
 {
     public interface IBindData
     {

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 
-namespace BitFramework.Conatiner
+namespace BitFramework.Container
 {
     public class Container : IContainer
     {
@@ -472,6 +472,21 @@ namespace BitFramework.Conatiner
                 ? bindData
                 : new BindData(service, null, false);
         }
+
+        private object ResolveClass(BindData bindData, string service, ParameterInfo baseParam)
+        {
+            // TODO:
+            return null;
+        }
+
+        private bool ResolveFromContextual(BindData bindData, string service, string paramName, Type paramType,
+            out object output)
+        {
+            // TODO:
+            output = null;
+            return true;
+        }
+
 
         private bool IsMade(string service)
         {
