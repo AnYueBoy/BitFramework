@@ -287,6 +287,7 @@ namespace BitFramework.Container
                 return null;
             }
 
+            // 过滤出userParams参数列表中继承IParams的部分
             var tables = GetParamsTypeInUserParams(ref userParams);
             return tables.Length <= 0 ? null : MakeParamsMatcher(tables);
         }
@@ -294,8 +295,6 @@ namespace BitFramework.Container
         /// <summary>
         /// 过滤获取UserParams中参数继承IParams的部分
         /// </summary>
-        /// <param name="userParams"></param>
-        /// <returns></returns>
         private IParams[] GetParamsTypeInUserParams(ref object[] userParams)
         {
             IList<IParams> elements = new List<IParams>();
@@ -314,17 +313,19 @@ namespace BitFramework.Container
         {
             //## 默认匹配器策略将匹配具有参数表的参数名称,并返回第一个有效参数值
 
-            //  ParameterInfo 发现参数的属性并提供对参数元数据的访问权限。
+            //  ParameterInfo: 发现参数的属性并提供对参数元数据的访问权限。
             return (parameterInfo) =>
             {
                 // 将tables参数参数名称获得的对象转为参数类型的实例
                 foreach (var table in tables)
                 {
+                    // 通过参数名获取对应的参数实例
                     if (!table.TryGetValue(parameterInfo.Name, out object result))
                     {
                         continue;
                     }
 
+                    // 将参数实例转换为对应参数类型的实例
                     if (ChangeType(ref result, parameterInfo.ParameterType))
                     {
                         return result;
@@ -406,6 +407,7 @@ namespace BitFramework.Container
 
         private object GetCompactInjectUserParams(ParameterInfo baseParam, ref object[] userParams)
         {
+            // 检测是否可以压缩注入参数
             if (!CheckCompactInjectUserParams(baseParam, userParams))
             {
                 return null;
@@ -454,6 +456,7 @@ namespace BitFramework.Container
 
                 removeParam = userParam;
                 originParamList.Remove(userParam);
+                break;
             }
 
             userParams = originParamList.ToArray();
@@ -485,6 +488,18 @@ namespace BitFramework.Container
             // TODO:
             output = null;
             return true;
+        }
+
+        private bool MakeFromContextualClosure(Func<object> closure, Type needType, out object output)
+        {
+            output = null;
+            if (closure == null)
+            {
+                return false;
+            }
+
+            output = closure;
+            return ChangeType(ref output, needType);
         }
 
 
