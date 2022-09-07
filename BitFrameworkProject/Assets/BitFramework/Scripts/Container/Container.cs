@@ -8,6 +8,11 @@ namespace BitFramework.Container
 {
     public class Container : IContainer
     {
+        /// <summary>
+        /// 禁止字符
+        /// </summary>
+        private static readonly char[] ServiceBanChars = { '@', ':', '$' };
+
         // 服务-绑定数据映射
         // 为何不直接使用Type作为key，因为框架中提供了别名逻辑，通过别名反映射到Type Name后，通过反射获取对应的Type
         private readonly Dictionary<string, BindData> bindings;
@@ -519,6 +524,36 @@ namespace BitFramework.Container
             // 获取一个值，通过该值指示 Type 是否为基元类型之一。
             // 基元类型有 Boolean, Byte, SByte, Int16, UInt16, Int32, UInt32, Int64, UInt64, IntPtr, UIntPtr, Char, Double, and Single.
             return type == null || type.IsPrimitive || type == typeof(string);
+        }
+
+        internal void Unbind(IBindable bindable)
+        {
+            // TODO:
+            GuardFlushing();
+            
+        }
+
+        private void GuardFlushing()
+        {
+            
+        }
+
+        /// <summary>
+        /// 触发指定列表的所有回调函数
+        /// </summary>
+        internal static object Trigger(IBindData bindData, object instance, List<Action<IBindData, object>> list)
+        {
+            if (list == null)
+            {
+                return instance;
+            }
+
+            foreach (var closure in list)
+            {
+                closure?.Invoke(bindData, instance);
+            }
+
+            return instance;
         }
 
         public string TypeConvertToService(Type type)
