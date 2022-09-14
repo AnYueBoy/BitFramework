@@ -95,6 +95,31 @@ namespace BitFramework.Util
             return elements;
         }
 
+        public TElement First()
+        {
+            if (header.Level[0].Forward != null)
+            {
+                return header.Level[0].Forward.Element;
+            }
+
+            throw new InvalidOperationException($"{nameof(SortSet<TElement, TScore>)} is empty.");
+        }
+
+        public TElement Last()
+        {
+            if (tail != null)
+            {
+                return tail.Element;
+            }
+            
+            throw new InvalidOperationException($"{nameof(SortSet<TElement, TScore>)} is empty.");
+        }
+
+        public TElement Shift()
+        {
+            
+        }
+
         public TElement GetElementByRank(int rank)
         {
             rank = Math.Max(0, rank);
