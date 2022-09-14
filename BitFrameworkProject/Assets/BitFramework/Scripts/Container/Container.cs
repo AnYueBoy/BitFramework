@@ -17,8 +17,32 @@ namespace BitFramework.Container
         // 为何不直接使用Type作为key，因为框架中提供了别名逻辑，通过别名反映射到Type Name后，通过反射获取对应的Type
         private readonly Dictionary<string, BindData> bindings;
 
-        // 服务-实例映射
+        // 服务-单例映射
         private readonly Dictionary<string, object> instances;
+
+        // 单例-服务反向映射
+        private readonly Dictionary<object, string> instancesReverse;
+
+        // 别名-服务映射
+        private readonly Dictionary<string, string> aliases;
+
+        // 服务-别名列表反映射
+        private readonly Dictionary<string,List< string>> aliasesReverse;
+
+        // 服务-tag列表映射
+        private readonly Dictionary<string, List<string>> tags;
+
+        // 全局解析的回调列表
+        private readonly List<Action<IBindData, object>> resolving;
+
+        // 全局解析后的回调列表
+        private readonly List<Action<IBindData, object>> afterResolving;
+
+        // 全局释放的回调列表
+        private readonly List<Action<IBindData, object>> release;
+
+        // 服务的扩展闭包
+        private readonly Dictionary<string, List<Func<object, IContainer, object>>> extenders;
 
         // 已被构建的服务列表
         private readonly HashSet<string> madeSet;
