@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using BitFramework.Util;
 
 namespace BitFramework.Container
 {
@@ -27,7 +28,7 @@ namespace BitFramework.Container
         private readonly Dictionary<string, string> aliases;
 
         // 服务-别名列表反映射
-        private readonly Dictionary<string,List< string>> aliasesReverse;
+        private readonly Dictionary<string, List<string>> aliasesReverse;
 
         // 服务-tag列表映射
         private readonly Dictionary<string, List<string>> tags;
@@ -44,6 +45,23 @@ namespace BitFramework.Container
         // 服务的扩展闭包
         private readonly Dictionary<string, List<Func<object, IContainer, object>>> extenders;
 
+        // 将字符转换成服务类型
+        private readonly SortSet<Func<string, Type>, int> findType;
+
+        // 已找到的类型缓存
+        private readonly Dictionary<string, Type> findTypeCache;
+
+        // 已解析的服务的哈希集
+        private readonly HashSet<string> resolved;
+
+        // 单例服务构建时间列表
+        private readonly SortSet<string, int> instanceTiming;
+
+        // 所有已注册的回弹回调。
+        private readonly Dictionary<string, List<Action<object>>> rebound;
+        
+        // private readonly 
+
         // 已被构建的服务列表
         private readonly HashSet<string> madeSet;
 
@@ -52,12 +70,6 @@ namespace BitFramework.Container
 
         // 正在构建的服务参数栈
         private Stack<object[]> userParamsStack { get; }
-
-        // 根据服务名称获取服务类型的回调列表
-        private readonly List<Func<string, Type>> findType;
-
-        // 缓存服务到具体服务类型的缓存
-        private readonly Dictionary<string, Type> findTypeCache;
 
         public IBindData Bind(string service, Type concrete, bool isStatic)
         {
@@ -554,12 +566,10 @@ namespace BitFramework.Container
         {
             // TODO:
             GuardFlushing();
-            
         }
 
         private void GuardFlushing()
         {
-            
         }
 
         /// <summary>
