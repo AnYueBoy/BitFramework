@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SException = System.Exception;
 
 namespace BitFramework.EventDispatcher
 {
@@ -16,7 +17,7 @@ namespace BitFramework.EventDispatcher
         {
             if (string.IsNullOrEmpty(eventName) || handler == null)
             {
-                throw new Exception("eventName or handler is null.");
+                throw new SException("eventName or handler is null.");
             }
 
             if (!handlerDic.TryGetValue(eventName, out var handlersList))
@@ -26,7 +27,7 @@ namespace BitFramework.EventDispatcher
 
             if (handlersList.Contains(handler))
             {
-                throw new Exception(
+                throw new SException(
                     $"repeat event handler been added. eventName: {eventName}, handler {handler.GetType().Name}");
             }
 
@@ -43,12 +44,12 @@ namespace BitFramework.EventDispatcher
 
             if (!handlerDic.TryGetValue(eventName, out var handlers))
             {
-                throw new Exception($"will remove event not exist. eventName: {eventName}");
+                throw new SException($"will remove event not exist. eventName: {eventName}");
             }
 
             if (!handlers.Contains(handler))
             {
-                throw new Exception($"will remove event handler not exist. handler: {handler.GetType().Name}");
+                throw new SException($"will remove event handler not exist. handler: {handler.GetType().Name}");
             }
 
             handlers.Remove(handler);
@@ -62,7 +63,7 @@ namespace BitFramework.EventDispatcher
         {
             if (!handlerDic.TryGetValue(eventName, out var handlers))
             {
-                throw new Exception($"raise event name not exist. eventName:{eventName}");
+                throw new SException($"raise event name not exist. eventName:{eventName}");
             }
 
             e = e ?? new EventParam();
