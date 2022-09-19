@@ -69,7 +69,7 @@ namespace BitFramework.Container
         /// <returns>方法返回值</returns>
         public object Invoke(string method, params object[] userParams)
         {
-            Guard.ParameterNotNull(method, nameof(method));
+            Guard.ParameterNotNull(method);
 
             if (!methodMappings.TryGetValue(method, out MethodBind methodBind))
             {
