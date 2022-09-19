@@ -15,7 +15,7 @@ namespace BitFramework.Container
         /// <summary>
         /// 禁止字符
         /// </summary>
-        private static readonly char[] ServiceBanChars = { '@', ':', '$' };
+        private static readonly char[] ServiceBanChars = {'@', ':', '$'};
 
         // 服务-绑定数据映射
         // 为何不直接使用Type作为key，因为框架中提供了别名逻辑，通过别名反映射到Type Name后，通过反射获取对应的Type
@@ -88,16 +88,16 @@ namespace BitFramework.Container
         public Container(int prime = 64)
         {
             prime = Math.Max(8, prime);
-            tags = new Dictionary<string, List<string>>((int)(prime * 0.25));
+            tags = new Dictionary<string, List<string>>((int) (prime * 0.25));
             aliases = new Dictionary<string, string>(prime * 4);
             aliasesReverse = new Dictionary<string, List<string>>(prime * 4);
             instances = new Dictionary<string, object>(prime * 4);
             instancesReverse = new Dictionary<object, string>(prime * 4);
             bindings = new Dictionary<string, BindData>(prime * 4);
-            resolving = new List<Action<IBindData, object>>((int)(prime * 0.25));
-            afterResolving = new List<Action<IBindData, object>>((int)(prime * 0.25));
-            release = new List<Action<IBindData, object>>((int)(prime * 0.25));
-            extenders = new Dictionary<string, List<Func<object, IContainer, object>>>((int)(prime * 0.25));
+            resolving = new List<Action<IBindData, object>>((int) (prime * 0.25));
+            afterResolving = new List<Action<IBindData, object>>((int) (prime * 0.25));
+            release = new List<Action<IBindData, object>>((int) (prime * 0.25));
+            extenders = new Dictionary<string, List<Func<object, IContainer, object>>>((int) (prime * 0.25));
             resolved = new HashSet<string>();
             findType = new SortSet<Func<string, Type>, int>();
             findTypeCache = new Dictionary<string, Type>(prime * 4);
@@ -112,8 +112,12 @@ namespace BitFramework.Container
 
         public object this[string service]
         {
-            // get=>
-            // TODO:
+            get => Make(service);
+            set
+            {
+                GetBind(service)?.Unbind();
+                // TODO: 绑定逻辑
+            }
         }
 
         #region Build
@@ -146,7 +150,16 @@ namespace BitFramework.Container
             {
                 var bindData = GetBindFillable(service);
 
-                instance = 
+                // 开始构建服务的实例并尝试进行依赖注入
+                instance = Build(bindData, userParams);
+
+                // TODO: 扩展Extend
+
+                // TODO: 单例判断
+                // instance = bindData.IsStatic?
+
+                resolved.Add(bindData.Service);
+                return instance;
             }
             finally
             {
@@ -168,6 +181,33 @@ namespace BitFramework.Container
 
         protected virtual object CreateInstance(Bindable makeServiceBindData, Type makeServiceType, object[] userParams)
         {
+            if (IsUnableType(makeServiceType))
+            {
+                return null;
+            }
+
+            // 该函数会选取合适的构造函数并返回符合的参数列表
+            userParams = GetConstructorsInjectParams(makeServiceBindData, makeServiceType, userParams);
+            try
+            {
+                // userParams通过合适的构造函数并返回符合的参数列表后通过反射创建实例
+                return CreateInstance(makeServiceType, userParams);
+            }
+            catch (SException e)
+            {
+                throw MakeBuildFailedException(makeServiceBindData.Service, makeServiceType, e);
+            }
+        }
+
+        protected virtual object CreateInstance(Type makeServiceType, object[] userParams)
+        {
+            //如果参数不存在，则在反射时无需写入参数 可获得更好的性能
+            if (userParams == null || userParams.Length <= 0)
+            {
+                return Activator.CreateInstance(makeServiceType);
+            }
+
+            return Activator.CreateInstance(makeServiceType, userParams);
         }
 
         /// <summary>
@@ -185,6 +225,9 @@ namespace BitFramework.Container
             return ChangeInstanceType(ref output, needType);
         }
 
+        /// <summary>
+        /// 通过服务名城获取实例
+        /// </summary>
         protected virtual bool MakeFromContextualService(string service, Type needType, out object output)
         {
             output = null;
@@ -225,13 +268,13 @@ namespace BitFramework.Container
         protected virtual object ResolveAttrClass(Bindable makeServiceBindData, string service, PropertyInfo baseParam)
         {
             if (ResolveFromContextual(makeServiceBindData, service, baseParam.Name, baseParam.PropertyType,
-                    out object instance))
+                out object instance))
             {
                 return instance;
             }
 
             // 检索应用于指定成员的指定类型的自定义特性。
-            var inject = (InjectAttribute)baseParam.GetCustomAttribute(typeof(InjectAttribute));
+            var inject = (InjectAttribute) baseParam.GetCustomAttribute(typeof(InjectAttribute));
             if (inject != null && !inject.Required)
             {
                 return skipped;
@@ -247,7 +290,7 @@ namespace BitFramework.Container
             PropertyInfo baseParam)
         {
             if (ResolveFromContextual(makeServiceBindData, service, baseParam.Name, baseParam.PropertyType,
-                    out object instance))
+                out object instance))
             {
                 return instance;
             }
@@ -258,13 +301,59 @@ namespace BitFramework.Container
                 return null;
             }
 
-            var inject = (InjectAttribute)baseParam.GetCustomAttribute(typeof(InjectAttribute));
+            var inject = (InjectAttribute) baseParam.GetCustomAttribute(typeof(InjectAttribute));
             if (inject != null && !inject.Required)
             {
                 return skipped;
             }
 
             throw MakeUnresolvableException(baseParam.Name, baseParam.DeclaringType);
+        }
+
+        /// <summary>
+        /// 解析引用类型的构造函数
+        /// </summary>
+        protected virtual object ResolveClass(Bindable makeServiceBindData, string service, ParameterInfo baseParam)
+        {
+            if (ResolveFromContextual(makeServiceBindData, service, baseParam.Name, baseParam.ParameterType,
+                out object instance))
+            {
+                return instance;
+            }
+
+            // 该值指示该参数是否可选
+            if (baseParam.IsOptional)
+            {
+                return baseParam.DefaultValue;
+            }
+
+            // baseParam.Member可能为空，并且可能在某些底层开发覆盖ParameterInfo类时发生
+            throw MakeUnresolvableException(baseParam.Name, baseParam.Member?.DeclaringType);
+        }
+
+        /// <summary>
+        /// 解析基元类型的构造函数
+        /// </summary>
+        protected virtual object ResolvePrimitive(Bindable makeServiceBindData, string service, ParameterInfo baseParam)
+        {
+            if (ResolveFromContextual(makeServiceBindData, service, baseParam.Name, baseParam.ParameterType,
+                out object instance))
+            {
+                return instance;
+            }
+
+            if (baseParam.IsOptional)
+            {
+                return baseParam.DefaultValue;
+            }
+
+            if (baseParam.ParameterType.IsGenericType &&
+                baseParam.ParameterType.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                return null;
+            }
+
+            throw MakeUnresolvableException(baseParam.Name, baseParam.Member?.DeclaringType);
         }
 
         #endregion
@@ -331,6 +420,227 @@ namespace BitFramework.Container
                 // 通过反射设置属性值
                 property.SetValue(makeServiceInstance, instance, null);
             }
+        }
+
+        /// <summary>
+        /// 选取合适的构造函数并获取符合的参数数组
+        /// </summary>
+        protected virtual object[] GetConstructorsInjectParams(Bindable makerServiceBindData, Type makerServiceType,
+            object[] userParams)
+        {
+            var constructors = makerServiceType.GetConstructors();
+            if (constructors.Length <= 0)
+            {
+                return Array.Empty<object>();
+            }
+
+            ExceptionDispatchInfo exceptionDispatchInfo = null;
+            foreach (var constructor in constructors)
+            {
+                try
+                {
+                    return GetDependencies(makerServiceBindData, constructor.GetParameters(), userParams);
+                }
+                catch (SException e)
+                {
+                    if (exceptionDispatchInfo == null)
+                    {
+                        exceptionDispatchInfo = ExceptionDispatchInfo.Capture(e);
+                    }
+                }
+            }
+
+            exceptionDispatchInfo?.Throw();
+            throw new AssertException("Exception dispatch info is null.");
+        }
+
+        /// <summary>
+        /// 获取要解析的实例的依赖参数的参数列表
+        /// </summary>
+        protected internal virtual object[] GetDependencies(Bindable makeServiceBindData, ParameterInfo[] baseParams,
+            object[] userParams)
+        {
+            if (baseParams.Length <= 0)
+            {
+                return Array.Empty<object>();
+            }
+
+            var results = new object[baseParams.Length];
+
+            // 获取用于筛选参数的参数匹配器
+            var matcher = GetParamsMather(ref userParams);
+            for (int i = 0; i < baseParams.Length; i++)
+            {
+                var baseParam = baseParams[i];
+
+                // 第一种策略 
+                // 参数匹配器是第一个执行的，因为它们的匹配精度是最精确的
+                var param = matcher?.Invoke(baseParam);
+
+                // 第二种策略
+                // 当容器发现开发人员使用object或object[]作为依赖参数类型时，我们尝试压缩注入的用户参数。
+                param = param ?? GetCompactInjectUserParams(baseParam, ref userParams);
+
+                // 第三种策略
+                // 从用户参数中选择适当的参数，并按相对顺序注入它们
+                param = param ?? GetDependenciesFromUserParams(baseParam, ref userParams);
+
+                string needService = null;
+                if (param == null)
+                {
+                    // 最后策略
+                    // 尝试通过依赖注入容器生成所需的参数
+                    needService = TypeConvertToService(baseParam.ParameterType);
+
+                    if (baseParam.ParameterType.IsClass || baseParam.ParameterType.IsInterface)
+                    {
+                        param = ResolveClass(makeServiceBindData, needService, baseParam);
+                    }
+                    else
+                    {
+                        param = ResolvePrimitive(makeServiceBindData, needService, baseParam);
+                    }
+                }
+
+                if (!CanInject(baseParam.ParameterType, param))
+                {
+                    var error =
+                        $"[{makeServiceBindData.Service}] Params inject type must be [{baseParam.ParameterType}] ," +
+                        $" But instance is [{param?.GetType()}]";
+                    if (needService == null)
+                    {
+                        error += " Inject params from user incoming parameters";
+                    }
+                    else
+                    {
+                        error += $" Make service is [{needService}]";
+                    }
+
+                    throw new UnresolvableException(error);
+                }
+
+                results[i] = param;
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// 获取参数匹配器
+        /// </summary>
+        /// <param name="userParams">用户参数的数组</param>
+        /// <returns>返回参数匹配器，如果为空，则没有匹配器</returns>
+        protected virtual Func<ParameterInfo, object> GetParamsMather(ref object[] userParams)
+        {
+            if (userParams == null || userParams.Length <= 0)
+            {
+                return null;
+            }
+
+            var tables = GetParamsTypeInUserParams(ref userParams);
+            return tables.Length <= 0 ? null : MakeParamsMatcher(tables);
+        }
+
+        /// <summary>
+        /// 生成默认参数IParams匹配器
+        /// </summary>
+        private Func<ParameterInfo, object> MakeParamsMatcher(IParams[] tables)
+        {
+            // 默认匹配器策略 将参数名与参数表的参数名相匹配
+            // 第一个有效参数值将作为返回值返回
+            return parameterInfo =>
+            {
+                foreach (var table in tables)
+                {
+                    if (!table.TryGetValue(parameterInfo.Name, out object result))
+                    {
+                        continue;
+                    }
+
+                    if (ChangeInstanceType(ref result, parameterInfo.ParameterType))
+                    {
+                        return result;
+                    }
+                }
+
+                return null;
+            };
+        }
+
+        /// <summary>
+        /// 从userParams中获取IParams类型的参数列表
+        /// </summary>
+        private IParams[] GetParamsTypeInUserParams(ref object[] userParams)
+        {
+            // 过滤出 参数列表中类型为IParams的参数
+            var elements = Arr.Filter(userParams, value => value is IParams);
+            var results = new IParams[elements.Length];
+            for (int i = 0; i < elements.Length; i++)
+            {
+                results[i] = (IParams) elements[i];
+            }
+
+            // 将过滤出的IParams类型的参数转换为数组
+            return results;
+        }
+
+        /// <summary>
+        /// 获取通过压缩注入的参数
+        /// 通过反射对参数与用户输入参数进行策略分析，并返回合适的参数
+        /// </summary>
+        protected virtual object GetCompactInjectUserParams(ParameterInfo baseParam, ref object[] userParams)
+        {
+            if (!CheckCompactInjectUserParams(baseParam, userParams))
+            {
+                return null;
+            }
+
+            try
+            {
+                // 如果参数类型为object 且用户参数为一个时，则返回用户参数列表的第一个即可
+                if (baseParam.ParameterType == typeof(object) && userParams != null && userParams.Length == 1)
+                {
+                    return userParams[0];
+                }
+
+                return userParams;
+            }
+            finally
+            {
+                userParams = null;
+            }
+        }
+
+        /// <summary>
+        /// 从用户参数获取依赖项。
+        /// </summary>
+        /// <param name="baseParam">依赖类型</param>
+        /// <param name="userParams">用户参数列表</param>
+        /// <returns>与依赖项类型匹配的实例</returns>
+        protected virtual object GetDependenciesFromUserParams(ParameterInfo baseParam, ref object[] userParams)
+        {
+            if (userParams == null)
+            {
+                return null;
+            }
+
+            GuardUserParamsCount(userParams.Length);
+
+            for (int i = 0; i < userParams.Length; i++)
+            {
+                var userParam = userParams[i];
+                if (!ChangeInstanceType(ref userParam, baseParam.ParameterType))
+                {
+                    continue;
+                }
+
+                // 移除用户参数列表中符合条件的项
+                Arr.RemoveAt(ref userParams, i);
+                // 返回符合条件的参数
+                return userParam;
+            }
+
+            return null;
         }
 
         #endregion
@@ -407,7 +717,6 @@ namespace BitFramework.Container
         }
 
         #endregion
-
 
         #region Bindable Data
 
@@ -496,6 +805,18 @@ namespace BitFramework.Container
             }
         }
 
+        /// <summary>
+        /// 确保用户传入的参数数必须小于指定值
+        /// </summary>
+        protected virtual void GuardUserParamsCount(int count)
+        {
+            if (count > 255)
+            {
+                throw new LogicException(
+                    $"Too many parameters, must be less or equal than 255 or override the {nameof(GuardUserParamsCount)}");
+            }
+        }
+
         private void GuardFlushing()
         {
             if (flushing)
@@ -558,6 +879,24 @@ namespace BitFramework.Container
         {
             return type == null || type.IsAbstract || type.IsInterface || type.IsArray || type.IsEnum ||
                    (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>));
+        }
+
+        /// <summary>
+        /// 检查用户传入的参数是否可以注入压缩
+        /// </summary>
+        /// <param name="baseParam">参数信息</param>
+        /// <param name="userParams">用户参数数组</param>
+        /// <returns>如果参数可以紧缩注入则返回True,否则返回False</returns>
+        protected virtual bool CheckCompactInjectUserParams(ParameterInfo baseParam, object[] userParams)
+        {
+            if (userParams == null || userParams.Length <= 0)
+            {
+                return false;
+            }
+
+            // 参数类型为object[] 或者object时，则参数可进行紧缩注入
+            return baseParam.ParameterType == typeof(object[])
+                   || baseParam.ParameterType == typeof(object);
         }
 
         #endregion
