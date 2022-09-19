@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using BitFramework.Exception;
 using BitFramework.Util;
 
 namespace BitFramework.Container
@@ -107,9 +108,175 @@ namespace BitFramework.Container
             instanceId = 0;
         }
 
+        public object this[string service]
+        {
+            // get=>
+            // TODO:
+        }
+
+        #region Build
+
+        public object Make(string service, params object[] userParams)
+        {
+            GuardConstruct(nameof(Make));
+            return Resolve(service, userParams);
+        }
+
+        protected object Resolve(string service, params object[] userParams)
+        {
+            Guard.ParameterNotNull(service);
+
+            service = AliasToService(service);
+            if (instances.TryGetValue(service, out object instance))
+            {
+                return instance;
+            }
+
+            if (BuildStack.Contains(service))
+            {
+                throw MakeCircularDependencyException(service);
+            }
+
+            BuildStack.Push(service);
+            UserParamsStack.Push(userParams);
+
+            try
+            {
+                var bindData = GetBindFillable(service);
+                
+                instance = 
+            }
+            finally
+            {
+                UserParamsStack.Pop();
+                BuildStack.Pop();
+            }
+        }
+
+        protected virtual object Build(BindData makeServiceBindData, object[] userParams)
+        {
+            var instance = makeServiceBindData.Concrete!=null? makeServiceBindData.Concrete(this,userParams):
+                CreateInstance(makeServiceBindData,)
+                
+        }
+
+        protected virtual object CreateInstance(Bindable makeServiceBindData, Type makeServiceType, object[] userParams)
+        {
+            
+        }
+
+        #endregion
+
+        #region Bindable Data
+
+        /// <summary>
+        /// 生成空绑定数据
+        /// </summary>
+        protected virtual BindData MakeEmptyBindData(string service)
+        {
+            return new BindData(this, service, null, false);
+        }
+
+        /// <summary>
+        /// 获取服务绑定数据，如果数据为空，则填写数据
+        /// </summary>
+        protected BindData GetBindFillable(string service)
+        {
+            return service != null && bindings.TryGetValue(service, out BindData bindData)
+                ? bindData
+                : MakeEmptyBindData(service);
+        }
+
+        #endregion
+
+        #region Tag
+
+        public void Tag(string tag, params string[] services)
+        {
+            Guard.ParameterNotNull(tag);
+            GuardFlushing();
+
+            if (!tags.TryGetValue(tag, out List<string> collection))
+            {
+                tags[tag] = collection = new List<string>();
+            }
+
+            foreach (var service in services ?? Array.Empty<string>())
+            {
+                if (string.IsNullOrEmpty(service))
+                {
+                    continue;
+                }
+
+                collection.Add(service);
+            }
+        }
+
+        public object[] Tagged(string tag)
+        {
+            Guard.ParameterNotNull(tag);
+
+            if (!tags.TryGetValue(tag, out List<string> services))
+            {
+                throw new LogicException($"Tag \"{tag}\" is not exist.");
+            }
+
+            return Arr.Map(services, service => Make(service));
+        }
+
+        #endregion
+
+        #region Guard
+
+        protected virtual void GuardConstruct(string method)
+        {
+        }
+
+        private void GuardFlushing()
+        {
+            if (flushing)
+            {
+                throw new LogicException("Container is flushing can not do it.");
+            }
+        }
+
+        #endregion
+
+        #region Util
+
+        protected virtual string FormatService(string service)
+        {
+            return service.Trim();
+        }
+
+        private string AliasToService(string name)
+        {
+            name = FormatService(name);
+            return aliases.TryGetValue(name, out string alias) ? alias : name;
+        }
+
         public string TypeConvertToService(Type type)
         {
             return type.ToString();
         }
+
+        #endregion
+
+        #region Exception
+
+        protected virtual LogicException MakeCircularDependencyException(string service)
+        {
+            var message = $"Circular dependency detected while for [{service}]";
+            message += GetBuildStackDebugMessage();
+            return new LogicException(message);
+        }
+
+        protected virtual string GetBuildStackDebugMessage()
+        {
+            var previous = string.Join(", ", BuildStack.ToArray());
+            return $" While building stack [{previous}]";
+        }
+
+        #endregion
     }
 }
