@@ -59,7 +59,7 @@ namespace BitFramework.Container
 
         // 所有已注册的回弹回调。
         private readonly Dictionary<string, List<Action<object>>> rebound;
-        
+
         // private readonly 
 
         // 已被构建的服务列表
@@ -255,7 +255,8 @@ namespace BitFramework.Container
             throw new Exception($"exception dispatch info is null.");
         }
 
-        private object[] GetDependencies(BindData bindData, ParameterInfo[] baseParams, object[] userParams)
+        protected internal virtual object[] GetDependencies(Bindable bindData, ParameterInfo[] baseParams,
+            object[] userParams)
         {
             // 构造函数接受的参数列表 baseParams
             if (baseParams.Length <= 0)
