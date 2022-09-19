@@ -155,13 +155,15 @@ namespace BitFramework.Container
             }
         }
 
+        /// <summary>
+        /// 构建指定服务
+        /// </summary>
         protected virtual object Build(BindData makeServiceBindData, object[] userParams)
         {
             var instance = makeServiceBindData.Concrete != null
                 ? makeServiceBindData.Concrete(this, userParams)
                 : CreateInstance(makeServiceBindData, SpeculatedServiceType(makeServiceBindData.Service), userParams);
-            // TODO:
-            return
+            return Inject(makeServiceBindData, instance);
         }
 
         protected virtual object CreateInstance(Bindable makeServiceBindData, Type makeServiceType, object[] userParams)
@@ -217,6 +219,9 @@ namespace BitFramework.Container
             return MakeFromContextualService(buildService, paramType, out output);
         }
 
+        /// <summary>
+        /// 解析引用类型的属性选择器
+        /// </summary>
         protected virtual object ResolveAttrClass(Bindable makeServiceBindData, string service, PropertyInfo baseParam)
         {
             if (ResolveFromContextual(makeServiceBindData, service, baseParam.Name, baseParam.PropertyType,
@@ -231,17 +236,52 @@ namespace BitFramework.Container
             {
                 return skipped;
             }
-            
-            throw 
+
+            throw MakeUnresolvableException(baseParam.Name, baseParam.DeclaringType);
+        }
+
+        /// <summary>
+        /// 解析基元类型的属性选择器
+        /// </summary>
+        protected virtual object ResolveAttrPrimitive(Bindable makeServiceBindData, string service,
+            PropertyInfo baseParam)
+        {
+            if (ResolveFromContextual(makeServiceBindData, service, baseParam.Name, baseParam.PropertyType,
+                    out object instance))
+            {
+                return instance;
+            }
+
+            if (baseParam.PropertyType.IsGenericType &&
+                baseParam.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                return null;
+            }
+
+            var inject = (InjectAttribute)baseParam.GetCustomAttribute(typeof(InjectAttribute));
+            if (inject != null && !inject.Required)
+            {
+                return skipped;
+            }
+
+            throw MakeUnresolvableException(baseParam.Name, baseParam.DeclaringType);
         }
 
         #endregion
 
         #region Dependency Inject
 
+        /// <summary>
+        /// 为指定实例进行依赖注入
+        /// </summary>
+        /// <param name="bindable"></param>
+        /// <param name="instance"></param>
+        /// <returns></returns>
         private object Inject(Bindable bindable, object instance)
         {
             GuardResolveInstance(instance, bindable.Service);
+            AttributeInject(bindable, instance);
+            return instance;
         }
 
         /// <summary>
@@ -268,12 +308,28 @@ namespace BitFramework.Container
                 object instance;
                 if (property.PropertyType.IsClass || property.PropertyType.IsInterface)
                 {
-                    instance = Re 
+                    instance = ResolveAttrClass(makeServiceBindData, needService, property);
                 }
                 else
                 {
-                    instance = 
+                    instance = ResolveAttrPrimitive(makeServiceBindData, needService, property);
                 }
+
+                // 确定两个实例是否为相同的实例
+                if (ReferenceEquals(instance, skipped))
+                {
+                    continue;
+                }
+
+                if (!CanInject(property.PropertyType, instance))
+                {
+                    throw new UnresolvableException(
+                        $"[{makeServiceBindData.Service}]({makeServiceInstance.GetType()}) Attr inject type must be [{property.PropertyType}], " +
+                        $"But instance is [{instance?.GetType()}], Make service is [{needService}].");
+                }
+
+                // 通过反射设置属性值
+                property.SetValue(makeServiceInstance, instance, null);
             }
         }
 
@@ -479,6 +535,14 @@ namespace BitFramework.Container
         }
 
         /// <summary>
+        /// 指定实例是否可注入
+        /// </summary>
+        protected virtual bool CanInject(Type type, object instance)
+        {
+            return instance == null || type.IsInstanceOfType(instance);
+        }
+
+        /// <summary>
         /// 确定指定的类型是否为容器的默认基本类型
         /// </summary>
         protected virtual bool IsBasicType(Type type)
@@ -599,8 +663,15 @@ namespace BitFramework.Container
 
             return $" InnerException message stack: [{stack}]";
         }
-        
-        protected virtual 
+
+        /// <summary>
+        /// 构建未解析的异常
+        /// </summary>
+        protected virtual UnresolvableException MakeUnresolvableException(string name, Type declaringClass)
+        {
+            return new UnresolvableException(
+                $"Unresolvable dependency , resolving [{name ?? "Unknown"}] in class [{declaringClass.ToString() ?? "Unknown"}]");
+        }
 
         #endregion
     }
