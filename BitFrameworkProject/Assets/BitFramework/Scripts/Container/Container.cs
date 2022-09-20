@@ -865,6 +865,28 @@ namespace BitFramework.Container
             methodContainer.Unbind(target);
         }
 
+        public object Invoke(string method, params object[] userParams)
+        {
+            GuardConstruct(nameof(Invoke));
+            return methodContainer.Invoke(method, userParams);
+        }
+
+        public object Call(object target, MethodInfo methodInfo, params object[] userParams)
+        {
+            Guard.Requires<ArgumentNullException>(methodInfo != null);
+            if (!methodInfo.IsStatic)
+            {
+                Guard.Requires<ArgumentNullException>(target != null);
+            }
+
+            GuardConstruct(nameof(Call));
+
+            var parameter = methodInfo.GetParameters();
+            var bindData = GetBindFillable(target != null ? TypeConvertToService(target.GetType()) : null);
+            userParams = GetDependencies(bindData, parameter, userParams) ?? Array.Empty<object>();
+            return methodInfo.Invoke(target, userParams);
+        }
+
         #endregion
 
         #region Event
