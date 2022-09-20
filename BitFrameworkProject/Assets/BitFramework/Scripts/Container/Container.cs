@@ -153,10 +153,12 @@ namespace BitFramework.Container
                 // 开始构建服务的实例并尝试进行依赖注入
                 instance = Build(bindData, userParams);
 
-                // TODO: 扩展Extend
+                // 如果我们为指定的服务定义了扩展程序，那么我们需要依次执行扩展程序，并允许扩展程序修改或覆盖原始服务
+                instance = Extend(service, instance);
 
-                // TODO: 单例判断
-                // instance = bindData.IsStatic?
+                instance = bindData.IsStatic
+                    ? Instance(bindData.Service, instance)
+                    : TriggerOnResolving(bindData, instance);
 
                 resolved.Add(bindData.Service);
                 return instance;
@@ -646,6 +648,29 @@ namespace BitFramework.Container
         #endregion
 
         #region Extend
+
+        private object Extend(string service, object instance)
+        {
+            if (extenders.TryGetValue(service, out List<Func<object, IContainer, object>> list))
+            {
+                foreach (var extender in list)
+                {
+                    instance = extender(instance, this);
+                }
+            }
+
+            if (!extenders.TryGetValue(string.Empty, out list))
+            {
+                return instance;
+            }
+
+            foreach (var extender in list)
+            {
+                instance = extender(instance, this);
+            }
+
+            return this;
+        }
 
         public void Extend(string service, Func<object, IContainer, object> closure)
         {
