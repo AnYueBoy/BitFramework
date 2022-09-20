@@ -1157,7 +1157,7 @@ namespace BitFramework.Container
 
         #endregion
 
-        #region Event
+        #region Trigger Event
 
         /// <summary>
         /// 触发指定服务实例的重绑定回调
