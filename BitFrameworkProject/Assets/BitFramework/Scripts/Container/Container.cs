@@ -751,7 +751,7 @@ namespace BitFramework.Container
 
         #endregion
 
-        #region Bind
+        #region Bind And UnBind
 
         public IBindData Bind(string service, Func<IContainer, object[], object> concrete, bool isStatic)
         {
@@ -797,6 +797,18 @@ namespace BitFramework.Container
             }
 
             return bindData;
+        }
+
+        public IMethodBind BindMethod(string method, object target, MethodInfo called)
+        {
+            GuardFlushing();
+            GuardMethodName(method);
+            return methodContainer.Bind(method, target, called);
+        }
+
+        public void UnbindMethod(object target)
+        {
+            methodContainer.Unbind(target);
         }
 
         #endregion
@@ -961,6 +973,10 @@ namespace BitFramework.Container
                         $"Service name {service}contains disabled characters : {c}. please use Alias replacement");
                 }
             }
+        }
+
+        protected virtual void GuardMethodName(string method)
+        {
         }
 
         private void GuardFlushing()
