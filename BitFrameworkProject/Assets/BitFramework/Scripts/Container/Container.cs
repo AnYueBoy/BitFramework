@@ -695,6 +695,9 @@ namespace BitFramework.Container
             {
                 return;
             }
+
+            Release(service);
+            TriggerOnRebound(service);
         }
 
         #endregion
