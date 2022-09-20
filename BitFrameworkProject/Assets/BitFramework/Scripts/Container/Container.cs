@@ -1590,5 +1590,45 @@ namespace BitFramework.Container
         }
 
         #endregion
+
+        #region Flush
+
+        public virtual void Flush()
+        {
+            try
+            {
+                flushing = true;
+                foreach (var service in instanceTiming.GetIterator(false))
+                {
+                    Release(service);
+                }
+
+                Guard.Requires<AssertException>(instances.Count <= 0);
+
+                tags.Clear();
+                aliases.Clear();
+                aliasesReverse.Clear();
+                instances.Clear();
+                bindings.Clear();
+                resolving.Clear();
+                release.Clear();
+                extenders.Clear();
+                resolved.Clear();
+                findType.Clear();
+                findTypeCache.Clear();
+                BuildStack.Clear();
+                UserParamsStack.Clear();
+                rebound.Clear();
+                methodContainer.Flush();
+                instanceTiming.Clear();
+                instanceId = 0;
+            }
+            finally
+            {
+                flushing = false;
+            }
+        }
+
+        #endregion
     }
 }
