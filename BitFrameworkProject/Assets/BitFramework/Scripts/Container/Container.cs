@@ -116,7 +116,7 @@ namespace BitFramework.Container
             set
             {
                 GetBind(service)?.Unbind();
-                // TODO: 绑定逻辑
+                Bind(service, (container, args) => value, false);
             }
         }
 
