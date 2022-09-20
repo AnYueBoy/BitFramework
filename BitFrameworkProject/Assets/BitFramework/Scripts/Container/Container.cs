@@ -832,6 +832,14 @@ namespace BitFramework.Container
             return false;
         }
 
+        public IContainer OnFindType(Func<string, Type> func, int priority = int.MaxValue)
+        {
+            Guard.Requires<ArgumentException>(func != null);
+            GuardFlushing();
+            findType.Add(func, priority);
+            return this;
+        }
+
         #endregion
 
         #region Bindable Data
@@ -965,6 +973,13 @@ namespace BitFramework.Container
             return false;
         }
 
+        public void Unbind(string service)
+        {
+            service = AliasToService(service);
+            var bind = GetBind(service);
+            bind?.Unbind();
+        }
+
         #endregion
 
         #region Method
@@ -1005,7 +1020,7 @@ namespace BitFramework.Container
 
         #endregion
 
-        #region Life Cycle
+        #region Release
 
         public bool Release(object mixed)
         {
@@ -1071,6 +1086,56 @@ namespace BitFramework.Container
         protected string GetServiceWithInstance(object instance)
         {
             return instancesReverse.TryGetValue(instance, out string origin) ? origin : null;
+        }
+
+        #endregion
+
+        #region Register Event
+
+        public IContainer OnRebound(string service, Action<object> callback)
+        {
+            Guard.Requires<ArgumentException>(callback != null);
+            GuardFlushing();
+
+            service = AliasToService(service);
+            if (!IsResolved(service) && !CanMake(service))
+            {
+                throw new LogicException(
+                    $"If you wan use Rebound(Watch), please {nameof(Bind)} or {nameof(Instance)} service first.");
+            }
+
+            if (!rebound.TryGetValue(service, out List<Action<object>> list))
+            {
+                rebound[service] = list = new List<Action<object>>();
+            }
+
+            list.Add(callback);
+            return this;
+        }
+
+        public IContainer OnResolving(Action<IBindData, object> closure)
+        {
+            AddClosure(closure, resolving);
+            return this;
+        }
+
+        public IContainer OnAfterResolving(Action<IBindData, object> closure)
+        {
+            AddClosure(closure, afterResolving);
+            return this;
+        }
+
+        public IContainer OnRelease(Action<IBindData, object> closure)
+        {
+            AddClosure(closure, release);
+            return this;
+        }
+
+        private void AddClosure(Action<IBindData, object> closure, List<Action<IBindData, object>> list)
+        {
+            Guard.Requires<ArgumentException>(closure != null);
+            GuardFlushing();
+            list.Add(closure);
         }
 
         #endregion
