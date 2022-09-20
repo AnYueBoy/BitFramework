@@ -15,7 +15,7 @@ namespace BitFramework.Container
         /// <summary>
         /// 禁止字符
         /// </summary>
-        private static readonly char[] ServiceBanChars = {'@', ':', '$'};
+        private static readonly char[] ServiceBanChars = { '@', ':', '$' };
 
         // 服务-绑定数据映射
         // 为何不直接使用Type作为key，因为框架中提供了别名逻辑，通过别名反映射到Type Name后，通过反射获取对应的Type
@@ -88,16 +88,16 @@ namespace BitFramework.Container
         public Container(int prime = 64)
         {
             prime = Math.Max(8, prime);
-            tags = new Dictionary<string, List<string>>((int) (prime * 0.25));
+            tags = new Dictionary<string, List<string>>((int)(prime * 0.25));
             aliases = new Dictionary<string, string>(prime * 4);
             aliasesReverse = new Dictionary<string, List<string>>(prime * 4);
             instances = new Dictionary<string, object>(prime * 4);
             instancesReverse = new Dictionary<object, string>(prime * 4);
             bindings = new Dictionary<string, BindData>(prime * 4);
-            resolving = new List<Action<IBindData, object>>((int) (prime * 0.25));
-            afterResolving = new List<Action<IBindData, object>>((int) (prime * 0.25));
-            release = new List<Action<IBindData, object>>((int) (prime * 0.25));
-            extenders = new Dictionary<string, List<Func<object, IContainer, object>>>((int) (prime * 0.25));
+            resolving = new List<Action<IBindData, object>>((int)(prime * 0.25));
+            afterResolving = new List<Action<IBindData, object>>((int)(prime * 0.25));
+            release = new List<Action<IBindData, object>>((int)(prime * 0.25));
+            extenders = new Dictionary<string, List<Func<object, IContainer, object>>>((int)(prime * 0.25));
             resolved = new HashSet<string>();
             findType = new SortSet<Func<string, Type>, int>();
             findTypeCache = new Dictionary<string, Type>(prime * 4);
@@ -268,13 +268,13 @@ namespace BitFramework.Container
         protected virtual object ResolveAttrClass(Bindable makeServiceBindData, string service, PropertyInfo baseParam)
         {
             if (ResolveFromContextual(makeServiceBindData, service, baseParam.Name, baseParam.PropertyType,
-                out object instance))
+                    out object instance))
             {
                 return instance;
             }
 
             // 检索应用于指定成员的指定类型的自定义特性。
-            var inject = (InjectAttribute) baseParam.GetCustomAttribute(typeof(InjectAttribute));
+            var inject = (InjectAttribute)baseParam.GetCustomAttribute(typeof(InjectAttribute));
             if (inject != null && !inject.Required)
             {
                 return skipped;
@@ -290,7 +290,7 @@ namespace BitFramework.Container
             PropertyInfo baseParam)
         {
             if (ResolveFromContextual(makeServiceBindData, service, baseParam.Name, baseParam.PropertyType,
-                out object instance))
+                    out object instance))
             {
                 return instance;
             }
@@ -301,7 +301,7 @@ namespace BitFramework.Container
                 return null;
             }
 
-            var inject = (InjectAttribute) baseParam.GetCustomAttribute(typeof(InjectAttribute));
+            var inject = (InjectAttribute)baseParam.GetCustomAttribute(typeof(InjectAttribute));
             if (inject != null && !inject.Required)
             {
                 return skipped;
@@ -316,7 +316,7 @@ namespace BitFramework.Container
         protected virtual object ResolveClass(Bindable makeServiceBindData, string service, ParameterInfo baseParam)
         {
             if (ResolveFromContextual(makeServiceBindData, service, baseParam.Name, baseParam.ParameterType,
-                out object instance))
+                    out object instance))
             {
                 return instance;
             }
@@ -337,7 +337,7 @@ namespace BitFramework.Container
         protected virtual object ResolvePrimitive(Bindable makeServiceBindData, string service, ParameterInfo baseParam)
         {
             if (ResolveFromContextual(makeServiceBindData, service, baseParam.Name, baseParam.ParameterType,
-                out object instance))
+                    out object instance))
             {
                 return instance;
             }
@@ -577,7 +577,7 @@ namespace BitFramework.Container
             var results = new IParams[elements.Length];
             for (int i = 0; i < elements.Length; i++)
             {
-                results[i] = (IParams) elements[i];
+                results[i] = (IParams)elements[i];
             }
 
             // 将过滤出的IParams类型的参数转换为数组
@@ -788,6 +788,52 @@ namespace BitFramework.Container
 
         #endregion
 
+        #region Alias
+
+        public IContainer Alias(string alias, string service)
+        {
+            Guard.ParameterNotNull(alias);
+            Guard.ParameterNotNull(service);
+
+            if (alias == service)
+            {
+                throw new LogicException($"Alias is same as service: \"{alias}\"");
+            }
+            
+            GuardFlushing();
+
+            alias = FormatService(alias);
+            service = AliasToService(service);
+
+            if (aliases.ContainsKey(alias))
+            {
+                throw new LogicException($"Alias \"{alias}\" is already exists.");
+            }
+
+            if (bindings.ContainsKey(alias))
+            {
+                throw new LogicException($"Alias \"{alias}\" has been used for service name.");
+            }
+
+            if (!bindings.ContainsKey(service) && !instances.ContainsKey(service))
+            {
+                throw new LogicException(
+                    $"You must {nameof(Bind)}() or {nameof(Instance)}() service before and you be able to called {nameof(Alias)}().");
+            }
+            
+            aliases.Add(alias,service);
+
+            if (!aliasesReverse.TryGetValue(service, out List<string> collection))
+            {
+                aliasesReverse[service] = collection = new List<string>();
+            }
+            
+            collection.Add(alias);
+            return this;
+        }
+
+        #endregion
+
         #region Guard
 
         protected virtual void GuardConstruct(string method)
@@ -853,6 +899,26 @@ namespace BitFramework.Container
             Guard.ParameterNotNull(service);
             service = AliasToService(service);
             return instances.ContainsKey(service);
+        }
+
+        public bool IsResolved(string service)
+        {
+            Guard.ParameterNotNull(service);
+
+            service = AliasToService(service);
+            return resolved.Contains(service) || instances.ContainsKey(service);
+        }
+
+        public bool IsStatic(string service)
+        {
+            var bind = GetBind(service);
+            return bind != null && bind.IsStatic;
+        }
+
+        public bool IsAlias(string name)
+        {
+            name = FormatService(name);
+            return aliases.ContainsKey(name);
         }
 
         /// <summary>
@@ -972,7 +1038,7 @@ namespace BitFramework.Container
         protected virtual UnresolvableException MakeBuildFailedException(string makeService, Type makeServiceType,
             SException innerException)
         {
-            var message = makeService != null
+            var message = makeServiceType != null
                 ? $"Class [{makeServiceType}] build failed. Service is [{makeService}]"
                 : $"Service [{makeService}] is not exists.";
             message += GetBuildStackDebugMessage();
