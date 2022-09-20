@@ -685,6 +685,9 @@ namespace BitFramework.Container
             }
         }
 
+        /// <summary>
+        /// 移除指定服务的所有扩展
+        /// </summary>
         public void ClearExtenders(string service)
         {
             GuardFlushing();
@@ -698,6 +701,62 @@ namespace BitFramework.Container
 
             Release(service);
             TriggerOnRebound(service);
+        }
+
+        #endregion
+
+        #region Instance
+
+        public object Instance(string service, object instance)
+        {
+            Guard.ParameterNotNull(service, nameof(service));
+            GuardFlushing();
+            GuardServiceName(service);
+
+            service = AliasToService(service);
+
+            var bindData = GetBind(service);
+            if (bindData != null)
+            {
+                if (!bindData.IsStatic)
+                {
+                    throw new LogicException($"Service [{service}] is not Singleton(Static) Bind.");
+                }
+            }
+            else
+            {
+                bindData = MakeEmptyBindData(service);
+            }
+
+            instance = TriggerOnResolving((BindData)bindData, instance);
+
+            if (instance != null && instancesReverse.TryGetValue(instance, out string realService) &&
+                realService != service)
+            {
+                throw new LogicException($"The instance has been registered as a singleton in {realService}");
+            }
+
+            var isResolved = IsResolved(service);
+            Release(service);
+
+            instances.Add(service, instance);
+
+            if (instance != null)
+            {
+                instancesReverse.Add(instance, service);
+            }
+
+            if (!instanceTiming.Contains(service))
+            {
+                instanceTiming.Add(service, instanceId++);
+            }
+
+            if (isResolved)
+            {
+                TriggerOnRebound(service, instance);
+            }
+
+            return instance;
         }
 
         #endregion
@@ -1042,6 +1101,25 @@ namespace BitFramework.Container
                     instance = Make(service);
                 }
             }
+        }
+
+        /// <summary>
+        /// 触发所有的解析中的事件回调
+        /// </summary>
+        private object TriggerOnResolving(BindData bindData, object instance)
+        {
+            instance = bindData.TriggerResolving(instance);
+            instance = Trigger(bindData, instance, resolving);
+            return TriggerOnAfterResolving(bindData, instance);
+        }
+
+        /// <summary>
+        /// 触发所有的解析后的事件回调
+        /// </summary>
+        private object TriggerOnAfterResolving(BindData bindData, object instance)
+        {
+            instance = bindData.TriggerAfterResolving(instance);
+            return Trigger(bindData, instance, afterResolving);
         }
 
         /// <summary>
