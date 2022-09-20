@@ -980,6 +980,23 @@ namespace BitFramework.Container
             bind?.Unbind();
         }
 
+        internal void Unbind(IBindable bindable)
+        {
+            GuardFlushing();
+            Release(bindable.Service);
+            if (aliasesReverse.TryGetValue(bindable.Service, out List<string> serviceList))
+            {
+                foreach (var alias in serviceList)
+                {
+                    aliases.Remove(alias);
+                }
+
+                aliasesReverse.Remove(bindable.Service);
+            }
+
+            bindings.Remove(bindable.Service);
+        }
+
         #endregion
 
         #region Method
