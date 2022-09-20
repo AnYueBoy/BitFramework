@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text;
@@ -240,6 +239,25 @@ namespace BitFramework.Container
 
             output = Make(service);
             return ChangeInstanceType(ref output, needType);
+        }
+
+        /// <summary>
+        /// 基于上下文获取构建闭包
+        /// </summary>
+        protected virtual Func<object> GetContextualClosure(Bindable makeServiceBindData, string service,
+            string paramName)
+        {
+            return makeServiceBindData.GetContextualClosure(service) ??
+                   makeServiceBindData.GetContextualClosure($"${paramName}");
+        }
+
+        /// <summary>
+        /// 根据上下文获取构建的服务
+        /// </summary>
+        protected virtual string GetContextualService(Bindable makeServiceBindData, string service, string paramName)
+        {
+            return makeServiceBindData.GetContextual(service) ?? makeServiceBindData.GetContextual($"${paramName}") ??
+                service;
         }
 
         /// <summary>
@@ -786,26 +804,7 @@ namespace BitFramework.Container
 
         #endregion
 
-        #region Other
-
-        /// <summary>
-        /// 基于上下文获取构建闭包
-        /// </summary>
-        protected virtual Func<object> GetContextualClosure(Bindable makeServiceBindData, string service,
-            string paramName)
-        {
-            return makeServiceBindData.GetContextualClosure(service) ??
-                   makeServiceBindData.GetContextualClosure($"${paramName}");
-        }
-
-        /// <summary>
-        /// 根据上下文获取构建的服务
-        /// </summary>
-        protected virtual string GetContextualService(Bindable makeServiceBindData, string service, string paramName)
-        {
-            return makeServiceBindData.GetContextual(service) ?? makeServiceBindData.GetContextual($"${paramName}") ??
-                service;
-        }
+        #region ChangeInstanceType
 
         protected virtual bool ChangeInstanceType(ref object result, Type targetType)
         {
@@ -856,6 +855,10 @@ namespace BitFramework.Container
 
             return false;
         }
+
+        #endregion
+
+        #region Add FindType
 
         public IContainer OnFindType(Func<string, Type> func, int priority = int.MaxValue)
         {
