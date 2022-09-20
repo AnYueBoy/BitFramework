@@ -645,6 +645,60 @@ namespace BitFramework.Container
 
         #endregion
 
+        #region Extend
+
+        public void Extend(string service, Func<object, IContainer, object> closure)
+        {
+            Guard.Requires<ArgumentNullException>(closure != null);
+            GuardFlushing();
+
+            service = string.IsNullOrEmpty(service) ? string.Empty : AliasToService(service);
+
+            if (!string.IsNullOrEmpty(service) && instances.TryGetValue(service, out object instance))
+            {
+                // 如果实例已经存在，则应用扩展
+                // 扩展将不再添加到永久扩展列表中
+                var old = instance;
+                instances[service] = instance = closure(instance, this);
+
+                if (!old.Equals(instance))
+                {
+                    instancesReverse.Remove(old);
+                    instancesReverse.Add(instance, service);
+                }
+
+                TriggerOnRebound(service, instance);
+                return;
+            }
+
+            // 服务尚未解析创建出instance，则将扩展放入扩展列表中，待服务解析时应用扩展
+            if (!extenders.TryGetValue(service, out List<Func<object, IContainer, object>> extender))
+            {
+                extenders[service] = extender = new List<Func<object, IContainer, object>>();
+            }
+
+            extender.Add(closure);
+
+            if (!string.IsNullOrEmpty(service) && IsResolved(service))
+            {
+                TriggerOnRebound(service);
+            }
+        }
+
+        public void ClearExtenders(string service)
+        {
+            GuardFlushing();
+            service = AliasToService(service);
+            extenders.Remove(service);
+
+            if (!IsResolved(service))
+            {
+                return;
+            }
+        }
+
+        #endregion
+
         #region Other
 
         /// <summary>
@@ -889,6 +943,76 @@ namespace BitFramework.Container
 
         #endregion
 
+        #region Life Cycle
+
+        public bool Release(object mixed)
+        {
+            if (mixed == null)
+            {
+                return false;
+            }
+
+            string service;
+            object instance = null;
+            if (!(mixed is string))
+            {
+                service = GetServiceWithInstance(mixed);
+            }
+            else
+            {
+                service = AliasToService(mixed.ToString());
+                if (!instances.TryGetValue(service, out instance))
+                {
+                    // 防止将字符串用作服务名称
+                    service = GetServiceWithInstance(mixed);
+                }
+            }
+
+            if (instance == null && (string.IsNullOrEmpty(service) || !instances.TryGetValue(service, out instance)))
+            {
+                return false;
+            }
+
+            var bindData = GetBindFillable(service);
+            bindData.TriggerRelease(instance);
+            TriggerOnRelease(bindData, instance);
+
+            if (instance != null)
+            {
+                DisposeInstance(instance);
+                instancesReverse.Remove(instance);
+            }
+
+            instances.Remove(service);
+            if (!HasOnReboundCallbacks(service))
+            {
+                instanceTiming.Remove(service);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 通过IDisposable释放指定实例
+        /// </summary>
+        private void DisposeInstance(object instance)
+        {
+            if (instance is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// 获取指定实例的服务名称
+        /// </summary>
+        protected string GetServiceWithInstance(object instance)
+        {
+            return instancesReverse.TryGetValue(instance, out string origin) ? origin : null;
+        }
+
+        #endregion
+
         #region Event
 
         /// <summary>
@@ -915,6 +1039,38 @@ namespace BitFramework.Container
                     instance = Make(service);
                 }
             }
+        }
+
+        /// <summary>
+        /// 触发指定服务实例的释放回调
+        /// </summary>
+        private void TriggerOnRelease(IBindData bindData, object instance)
+        {
+            Trigger(bindData, instance, release);
+        }
+
+        /// <summary>
+        /// 触发指定列表的回调
+        /// </summary>
+        internal static object Trigger(IBindData bindData, object instance, List<Action<IBindData, object>> list)
+        {
+            if (list == null)
+            {
+                return instance;
+            }
+
+            foreach (var closure in list)
+            {
+                closure(bindData, instance);
+            }
+
+            return instance;
+        }
+
+        private bool HasOnReboundCallbacks(string service)
+        {
+            var result = GetOnReboundCallbacks(service);
+            return result != null && result.Count > 0;
         }
 
         /// <summary>
