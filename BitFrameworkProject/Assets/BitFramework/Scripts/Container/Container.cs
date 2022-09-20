@@ -799,6 +799,60 @@ namespace BitFramework.Container
             return bindData;
         }
 
+        public IBindData Bind(string service, Type concrete, bool isStatic)
+        {
+            Guard.Requires<ArgumentNullException>(concrete != null, $"Parameter {nameof(concrete)} can not be null.");
+
+            if (IsUnableType(concrete))
+            {
+                throw new LogicException(
+                    $"Type \"{concrete}\" can not bind. please check if there is a list of types that cannot be built.");
+            }
+
+            service = FormatService(service);
+            return Bind(service, WrapperTypeBuilder(service, concrete), isStatic);
+        }
+
+        /// <summary>
+        /// 包装指定类型
+        /// </summary>
+        /// <returns>返回一个闭包，调用它来获取服务实例</returns>
+        protected virtual Func<IContainer, object[], object> WrapperTypeBuilder(string service, Type concrete)
+        {
+            return (container, userParams) =>
+                ((Container)container).CreateInstance(GetBindFillable(service), concrete, userParams);
+        }
+
+        public bool BindIf(string service, Func<IContainer, object[], object> concrete, bool isStatic,
+            out IBindData bindData)
+        {
+            var bind = GetBind(service);
+            if (bind == null && (HasInstance(service) || IsAlias(service)))
+            {
+                bindData = null;
+                return false;
+            }
+
+            bindData = bind ?? Bind(service, concrete, isStatic);
+            return bind == null;
+        }
+
+        public bool BindIf(string service, Type concrete, bool isStatic, out IBindData bindData)
+        {
+            if (!IsUnableType(concrete))
+            {
+                service = FormatService(service);
+                return BindIf(service, WrapperTypeBuilder(service, concrete), isStatic, out bindData);
+            }
+
+            bindData = null;
+            return false;
+        }
+
+        #endregion
+
+        #region Method
+
         public IMethodBind BindMethod(string method, object target, MethodInfo called)
         {
             GuardFlushing();
