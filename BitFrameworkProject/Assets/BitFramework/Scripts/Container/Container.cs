@@ -751,6 +751,94 @@ namespace BitFramework.Container
 
         #endregion
 
+        #region Bind
+
+        public IBindData Bind(string service, Func<IContainer, object[], object> concrete, bool isStatic)
+        {
+            Guard.ParameterNotNull(service);
+            Guard.ParameterNotNull(concrete);
+
+            GuardServiceName(service);
+            GuardFlushing();
+
+            service = FormatService(service);
+
+            if (bindings.ContainsKey(service))
+            {
+                throw new LogicException($"Bind [{service}] already exists.");
+            }
+
+            if (instances.ContainsKey(service))
+            {
+                throw new LogicException($"Instances [{service}] is already exists.");
+            }
+
+            if (aliases.ContainsKey(service))
+            {
+                throw new LogicException($"Alias [{service}] is already exists.");
+            }
+
+            var bindData = new BindData(this, service, concrete, isStatic);
+            bindings.Add(service, bindData);
+
+            if (!IsResolved(service))
+            {
+                return bindData;
+            }
+
+            if (isStatic)
+            {
+                // 如果为静态则直接解析该服务
+                Make(service);
+            }
+            else
+            {
+                TriggerOnRebound(service);
+            }
+
+            return bindData;
+        }
+
+        #endregion
+
+        #region Event
+
+        /// <summary>
+        /// 触发指定服务实例的重绑定回调
+        /// </summary>
+        /// <param name="service">指定的服务名称</param>
+        /// <param name="instance">指定的服务实例。如果传入空值，则按服务名称从容器生成</param>
+        private void TriggerOnRebound(string service, object instance = null)
+        {
+            var callbacks = GetOnReboundCallbacks(service);
+            if (callbacks == null || callbacks.Count <= 0)
+            {
+                return;
+            }
+
+            var bind = GetBind(service);
+            instance = instance ?? Make(service);
+
+            for (int i = 0; i < callbacks.Count; i++)
+            {
+                callbacks[i](instance);
+                if (i + 1 < callbacks.Count && (bind == null || !bind.IsStatic))
+                {
+                    instance = Make(service);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 获取指定服务的所有的重绑定回调
+        /// </summary>
+        private IList<Action<object>> GetOnReboundCallbacks(string service)
+        {
+            return !rebound.TryGetValue(service, out List<Action<object>> result) ? null : result;
+        }
+
+        #endregion
+
         #region Tag
 
         public void Tag(string tag, params string[] services)
@@ -799,7 +887,7 @@ namespace BitFramework.Container
             {
                 throw new LogicException($"Alias is same as service: \"{alias}\"");
             }
-            
+
             GuardFlushing();
 
             alias = FormatService(alias);
@@ -820,14 +908,14 @@ namespace BitFramework.Container
                 throw new LogicException(
                     $"You must {nameof(Bind)}() or {nameof(Instance)}() service before and you be able to called {nameof(Alias)}().");
             }
-            
-            aliases.Add(alias,service);
+
+            aliases.Add(alias, service);
 
             if (!aliasesReverse.TryGetValue(service, out List<string> collection))
             {
                 aliasesReverse[service] = collection = new List<string>();
             }
-            
+
             collection.Add(alias);
             return this;
         }
@@ -860,6 +948,18 @@ namespace BitFramework.Container
             {
                 throw new LogicException(
                     $"Too many parameters, must be less or equal than 255 or override the {nameof(GuardUserParamsCount)}");
+            }
+        }
+
+        protected virtual void GuardServiceName(string service)
+        {
+            foreach (var c in ServiceBanChars)
+            {
+                if (service.IndexOf(c) >= 0)
+                {
+                    throw new LogicException(
+                        $"Service name {service}contains disabled characters : {c}. please use Alias replacement");
+                }
             }
         }
 
