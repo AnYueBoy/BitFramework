@@ -256,5 +256,75 @@ namespace BitFramework.Container
         }
 
         #endregion
+
+        public static void Unbind<TService>(this IContainer container)
+        {
+            container.Unbind(container.TypeConvertToService(typeof(TService)));
+        }
+
+        public static void Tag<TService>(this IContainer container, string tag)
+        {
+            container.Tag(tag, container.TypeConvertToService(typeof(TService)));
+        }
+
+        public static object Instance<TService>(this IContainer container, object instance)
+        {
+            return container.Instance(container.TypeConvertToService(typeof(TService)), instance);
+        }
+
+        #region Release
+
+        public static bool Release<TService>(this IContainer container)
+        {
+            return container.Release(container.TypeConvertToService(typeof(TService)));
+        }
+
+        public static bool Release(this IContainer container, ref object[] instances, bool reverse = true)
+        {
+            if (instances == null || instances.Length <= 0)
+            {
+                return true;
+            }
+
+            if (reverse)
+            {
+                Array.Reverse(instances);
+            }
+
+            var errorIndex = 0;
+            for (int i = 0; i < instances.Length; i++)
+            {
+                if (instances[i] == null)
+                {
+                    continue;
+                }
+
+                if (!container.Release(instances[i]))
+                {
+                    instances[errorIndex++] = instances[i];
+                }
+            }
+
+            Array.Resize(ref instances, errorIndex);
+
+            if (reverse && errorIndex > 0)
+            {
+                Array.Reverse(instances);
+            }
+
+            return errorIndex <= 0;
+        }
+
+        #endregion
+
+        #region Call
+
+        public static void Call<T1>(this IContainer container, Action<T1> method, params object[] userParams)
+        {
+            Guard.Requires<ArgumentNullException>(method != null);
+            container.Call(method.Target, method.Method, userParams);
+        }
+
+        #endregion
     }
 }
