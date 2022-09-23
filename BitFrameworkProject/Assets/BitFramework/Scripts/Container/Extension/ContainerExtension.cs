@@ -54,12 +54,12 @@ namespace BitFramework.Container
 
         #region Bind
 
-        public static IBindData Bind<TService>(this Container container)
+        public static IBindData Bind<TService>(this IContainer container)
         {
             return container.Bind(container.TypeConvertToService(typeof(TService)), typeof(TService), false);
         }
 
-        public static IBindData Bind<TService, TConcrete>(this Container container)
+        public static IBindData Bind<TService, TConcrete>(this IContainer container)
         {
             return container.Bind(container.TypeConvertToService(typeof(TService)), typeof(TConcrete), false);
         }
@@ -77,7 +77,7 @@ namespace BitFramework.Container
                 false);
         }
 
-        public static IBindData Bind<TService>(this Container container, Func<object> concrete)
+        public static IBindData Bind<TService>(this IContainer container, Func<object> concrete)
         {
             Guard.Requires<ArgumentNullException>(concrete != null);
             return container.Bind(container.TypeConvertToService(typeof(TService)), (c, p) => concrete.Invoke(), false);
@@ -159,6 +159,12 @@ namespace BitFramework.Container
         {
             Guard.Requires<ArgumentNullException>(concrete != null);
             return container.Bind(container.TypeConvertToService(typeof(TService)), concrete, true);
+        }
+
+        public static IBindData Singleton<TService>(this IContainer container, Func<object[], object> concrete)
+        {
+            Guard.Requires<ArgumentNullException>(concrete != null);
+            return container.Bind(container.TypeConvertToService(typeof(TService)), (c, p) => concrete.Invoke(p), true);
         }
 
         public static IBindData Singleton<TService>(this IContainer container, Func<object> concrete)
@@ -502,7 +508,7 @@ namespace BitFramework.Container
             });
         }
 
-        public static IContainer OnRelease<T>(this IContainer container, Action<IBindable, T> closure)
+        public static IContainer OnRelease<T>(this IContainer container, Action<IBindData, T> closure)
         {
             Guard.Requires<ArgumentNullException>(closure != null);
             return container.OnRelease((bindData, instance) =>
