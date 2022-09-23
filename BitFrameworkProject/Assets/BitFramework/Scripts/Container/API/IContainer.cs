@@ -204,6 +204,14 @@ namespace BitFramework.Container
         void Extend(string service, Func<object, IContainer, object> closure);
 
         /// <summary>
+        /// 注册重绑定服务的事件
+        /// </summary>
+        /// <param name="service">服务名称或别名</param>
+        /// <param name="callback">回调</param>
+        /// <returns></returns>
+        IContainer OnRebound(string service, Action<object> callback);
+
+        /// <summary>
         /// 注册解析回调
         /// </summary>
         /// <param name="closure">回调</param>
