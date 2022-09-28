@@ -4,6 +4,7 @@ using BitFramework.Exception;
 using BitFramework.Scripts;
 using UnityEngine;
 using IServiceProvider = BitFramework.Core.IServiceProvider;
+using UComponent = UnityEngine.Component;
 
 namespace BitFramework.Runtime
 {
@@ -20,12 +21,12 @@ namespace BitFramework.Runtime
                 return;
             }
 
-            this.Singleton<MonoBehaviour>(() => behaviour).Alias<Component>();
+            this.Singleton<MonoBehaviour>(() => behaviour).Alias<UComponent>();
         }
 
         public override void Register(IServiceProvider provider, bool force = false)
         {
-            var component = provider as Component;
+            var component = provider as UComponent;
             // 从MonoBehaviour 基础的服务提供者只能挂载在GameObject上.
             if (component != null && !component)
             {
@@ -38,7 +39,7 @@ namespace BitFramework.Runtime
 
         protected override bool IsUnableType(Type type)
         {
-            return typeof(Component).IsAssignableFrom(type) || base.IsUnableType(type);
+            return typeof(UComponent).IsAssignableFrom(type) || base.IsUnableType(type);
         }
     }
 }
