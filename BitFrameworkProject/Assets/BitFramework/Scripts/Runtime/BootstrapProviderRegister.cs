@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using BitFramework.Core;
-using UnityEngine;
+using UComponent = UnityEngine.Component;
 
 namespace BitFramework.Runtime
 {
@@ -10,9 +10,9 @@ namespace BitFramework.Runtime
     public sealed class BootstrapProviderRegister : IBootstrap
     {
         private readonly IServiceProvider[] providers;
-        private readonly Component component;
+        private readonly UComponent component;
 
-        public BootstrapProviderRegister(Component component, IServiceProvider[] serviceProviders)
+        public BootstrapProviderRegister(UComponent component, IServiceProvider[] serviceProviders)
         {
             providers = serviceProviders;
             this.component = component;
