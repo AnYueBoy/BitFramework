@@ -334,20 +334,20 @@ namespace BitFramework.Component.AssetsModule
         /// <summary>
         /// 异步检查依赖项
         /// </summary>
-        private Promise.Promise CheckDependenciesAsync(string bundleName)
+        private Promise CheckDependenciesAsync(string bundleName)
         {
-            List<Promise.Promise> allPromise = new List<Promise.Promise>();
+            List<Promise> allPromise = new List<Promise>();
             AddAllDependenciesBundle(allPromise, bundleName);
-            return Promise.Promise.All(allPromise.ToArray());
+            return Promise.All(allPromise.ToArray());
         }
 
-        private void AddAllDependenciesBundle(List<Promise.Promise> promiseList, string bundleName)
+        private void AddAllDependenciesBundle(List<Promise> promiseList, string bundleName)
         {
             LoadManifestFile();
             string[] allDependencies = assetBundleManifest.GetAllDependencies(bundleName);
             if (allDependencies.Length <= 0)
             {
-                promiseList.Add(new Promise.Promise((Action resolve, Action<SException> reject) =>
+                promiseList.Add(new Promise((Action resolve, Action<SException> reject) =>
                 {
                     string bundleUrl = CommonUtil.GetBundleUrl() + bundleName;
                     LoadTargetBundleAsync(bundleUrl).Then(
