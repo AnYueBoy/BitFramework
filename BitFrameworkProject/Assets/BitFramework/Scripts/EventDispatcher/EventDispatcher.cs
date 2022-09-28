@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using UnityEngine;
 using SException = System.Exception;
 
 namespace BitFramework.EventDispatcher
@@ -63,7 +64,12 @@ namespace BitFramework.EventDispatcher
         {
             if (!handlerDic.TryGetValue(eventName, out var handlers))
             {
+#if UNITY_EDITOR
+                Debug.LogWarning($"{eventName} no listener.");
+                return;
+#else
                 throw new SException($"raise event name not exist. eventName:{eventName}");
+#endif
             }
 
             e = e ?? new EventParam();
