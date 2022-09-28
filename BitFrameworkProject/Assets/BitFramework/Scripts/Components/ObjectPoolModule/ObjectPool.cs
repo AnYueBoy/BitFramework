@@ -36,9 +36,9 @@ namespace BitFramework.Component.ObjectPoolModule
 
                 if (instance == null)
                 {
-                    GameObject gameObject = GameObject.Instantiate<GameObject>(prefab);
+                    GameObject gameObject = Object.Instantiate<GameObject>(prefab);
                     gameObject.name = prefab.name;
-                    this.relationShip.Add(gameObject, prefab);
+                    relationShip.Add(gameObject, prefab);
                     subPool.Add(gameObject);
                     instance = gameObject;
                 }
@@ -60,13 +60,13 @@ namespace BitFramework.Component.ObjectPoolModule
                 return;
             }
 
-            if (!this.relationShip.ContainsKey(target))
+            if (!relationShip.ContainsKey(target))
             {
                 Debug.LogError("target" + target + "is not exist correspond prefab");
                 return;
             }
 
-            GameObject targetPrefab = this.relationShip[target];
+            GameObject targetPrefab = relationShip[target];
             if (!pool.ContainsKey(targetPrefab))
             {
                 Debug.LogError("targetPrefab" + targetPrefab + "is not exist correspond pool");

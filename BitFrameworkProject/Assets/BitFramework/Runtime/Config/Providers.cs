@@ -1,4 +1,6 @@
-﻿using BitFramework.Core;
+﻿using BitFramework.Component.AssetsModule;
+using BitFramework.Component.ObjectPoolModule;
+using BitFramework.Core;
 
 public static class Providers
 {
@@ -8,7 +10,9 @@ public static class Providers
         {
             return new IServiceProvider[]
             {
-                // TODO: 项目中自定义的服务提供者
+                // 项目中自定义的服务提供者
+                new ProviderAssetsModule(),
+                new ProviderObjectPoolModule(),
             };
         }
     }

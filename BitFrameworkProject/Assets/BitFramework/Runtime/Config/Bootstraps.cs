@@ -8,7 +8,8 @@ public static class Bootstraps
     {
         return new IBootstrap[]
         {
-            new BootstrapProviderRegister(component, Providers.ServiceProviders)
+            new BootstrapProviderRegister(component, Providers.ServiceProviders),
+            // TODO: 其他引导程序
         };
     }
 }
