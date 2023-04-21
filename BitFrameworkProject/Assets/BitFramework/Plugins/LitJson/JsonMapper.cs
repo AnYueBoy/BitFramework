@@ -349,9 +349,12 @@ namespace LitJson
             return op;
         }
 
-        private static object ReadValue(Type inst_type, JsonReader reader)
+        private static object ReadValue(Type inst_type, JsonReader reader, bool skipFirstRead = false)
         {
-            reader.Read();
+            if (skipFirstRead)
+            {
+                reader.Read();
+            }
 
             if (reader.Token == JsonToken.ArrayEnd)
                 return null;
@@ -504,8 +507,25 @@ namespace LitJson
 
                         if (prop_data.IsField)
                         {
-                            ((FieldInfo)prop_data.Info).SetValue(
-                                instance, ReadValue(prop_data.Type, reader));
+                            if (TypeIsPolymorphismAttribute(prop_data.Type))
+                            {
+                                reader.Read(); // ObjectStart
+                                reader.Read(); // __ASSEMBLY__
+                                reader.Read();
+                                string assembly = (string)reader.Value;
+                                reader.Read(); // __TYPE__
+                                reader.Read();
+                                string type = (string)reader.Value;
+                                Type t = Assembly.Load(assembly).GetType(type);
+                                reader.Token = JsonToken.ObjectStart;
+                                ((FieldInfo)prop_data.Info).SetValue(
+                                    instance, ReadValue(prop_data.Type, reader, true));
+                            }
+                            else
+                            {
+                                ((FieldInfo)prop_data.Info).SetValue(
+                                    instance, ReadValue(prop_data.Type, reader));
+                            }
                         }
                         else
                         {
@@ -559,6 +579,29 @@ namespace LitJson
             }
 
             return instance;
+        }
+
+        /// <summary>
+        /// 该类或接口是否有多态标签
+        /// </summary>
+        private static bool TypeIsPolymorphismAttribute(Type t)
+        {
+            bool hasPolymorphismAttribute = Attribute.GetCustomAttribute(t, typeof(PolymorphicAttribute), true) != null;
+            if (hasPolymorphismAttribute)
+            {
+                return true;
+            }
+
+            foreach (var interfaceType in t.GetInterfaces())
+            {
+                if (Attribute.GetCustomAttribute(interfaceType, typeof(PolymorphicAttribute), true) != null)
+                {
+                    hasPolymorphismAttribute = true;
+                    break;
+                }
+            }
+
+            return hasPolymorphismAttribute;
         }
 
         private static IJsonWrapper ReadValue(WrapperFactory factory,
@@ -895,6 +938,16 @@ namespace LitJson
             IList<PropertyMetadata> props = type_properties[obj_type];
 
             writer.WriteObjectStart();
+
+            // 有多态标签，则记录实际的类型
+            if (TypeIsPolymorphismAttribute(obj_type))
+            {
+                writer.WritePropertyName("__ASSEMBLY__");
+                writer.Write(obj_type.Assembly.FullName);
+                writer.WritePropertyName("__TYPE__");
+                writer.Write(obj_type.FullName);
+            }
+
             foreach (PropertyMetadata p_data in props)
             {
                 if (p_data.IsField)
