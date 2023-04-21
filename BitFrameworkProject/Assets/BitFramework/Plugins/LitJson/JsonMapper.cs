@@ -282,20 +282,23 @@ namespace LitJson
             if (type_properties.ContainsKey(type))
                 return;
 
-            IList<PropertyMetadata> props = new List<PropertyMetadata>();
 
-            foreach (PropertyInfo p_info in type.GetProperties())
+            IList<PropertyMetadata> props = new List<PropertyMetadata>();
+            var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+            foreach (PropertyInfo p_info in properties)
             {
                 if (p_info.Name == "Item")
                     continue;
-
+                if (!p_info.CanWrite)
+                    continue;
                 PropertyMetadata p_data = new PropertyMetadata();
                 p_data.Info = p_info;
                 p_data.IsField = false;
                 props.Add(p_data);
             }
 
-            foreach (FieldInfo f_info in type.GetFields())
+            var fields = type.GetFields(BindingFlags.Instance | BindingFlags.Public);
+            foreach (FieldInfo f_info in fields)
             {
                 PropertyMetadata p_data = new PropertyMetadata();
                 p_data.Info = f_info;
@@ -421,6 +424,10 @@ namespace LitJson
                 if (conv_op != null)
                     return conv_op.Invoke(null,
                         new object[] { reader.Value });
+                if (json_type == typeof(double) && inst_type == typeof(float))
+                {
+                    return (float)(double)reader.Value;
+                }
 
                 // No luck
                 throw new JsonException(String.Format(
@@ -453,8 +460,6 @@ namespace LitJson
                     list = new ArrayList();
                     elem_type = inst_type.GetElementType();
                 }
-
-                list.Clear();
 
                 while (true)
                 {
@@ -534,6 +539,7 @@ namespace LitJson
                             }
                         }
 
+                        //让字典Key自适应类型
                         if (t_data.IsDictionary)
                         {
                             var dicTypes = instance.GetType().GetGenericArguments();
@@ -668,12 +674,6 @@ namespace LitJson
 
             base_exporters_table[typeof(ulong)] =
                 delegate(object obj, JsonWriter writer) { writer.Write((ulong)obj); };
-
-            base_exporters_table[typeof(DateTimeOffset)] =
-                delegate(object obj, JsonWriter writer)
-                {
-                    writer.Write(((DateTimeOffset)obj).ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz", datetime_format));
-                };
         }
 
         private static void RegisterBaseImporters()
@@ -720,9 +720,6 @@ namespace LitJson
             RegisterImporter(base_importers_table, typeof(double),
                 typeof(decimal), importer);
 
-            importer = delegate(object input) { return Convert.ToSingle((double)input); };
-            RegisterImporter(base_importers_table, typeof(double),
-                typeof(float), importer);
 
             importer = delegate(object input) { return Convert.ToUInt32((long)input); };
             RegisterImporter(base_importers_table, typeof(long),
@@ -789,9 +786,9 @@ namespace LitJson
                 return;
             }
 
-            if (obj is Single)
+            if (obj is float)
             {
-                writer.Write((float)obj);
+                writer.Write((double)(float)obj);
                 return;
             }
 
@@ -877,24 +874,18 @@ namespace LitJson
             if (obj is Enum)
             {
                 Type e_type = Enum.GetUnderlyingType(obj_type);
-
-                if (e_type == typeof(long))
-                    writer.Write((long)obj);
-                else if (e_type == typeof(uint))
-                    writer.Write((uint)obj);
-                else if (e_type == typeof(ulong))
+                if (e_type == typeof(long)
+                    || e_type == typeof(uint)
+                    || e_type == typeof(ulong))
                     writer.Write((ulong)obj);
-                else if (e_type == typeof(ushort))
-                    writer.Write((ushort)obj);
-                else if (e_type == typeof(short))
-                    writer.Write((short)obj);
-                else if (e_type == typeof(byte))
-                    writer.Write((byte)obj);
-                else if (e_type == typeof(sbyte))
-                    writer.Write((sbyte)obj);
-                else
+                else if (e_type == typeof(int))
                     writer.Write((int)obj);
-
+                else if (e_type == typeof(ushort))
+                    writer.Write((int)(ushort)obj);
+                else if (e_type == typeof(short))
+                    writer.Write((int)(short)obj);
+                else if (e_type == typeof(byte))
+                    writer.Write((int)(byte)obj);
                 return;
             }
 
